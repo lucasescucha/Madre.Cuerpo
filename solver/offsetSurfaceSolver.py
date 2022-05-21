@@ -1,7 +1,7 @@
 from surfaces.iSurface import ISurface
+
 import scipy.optimize as opt
 import numpy as np
-import math
 
 SOLVER_TOLERANCE = 1e-5
 
