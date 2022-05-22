@@ -2,8 +2,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-from stl import mesh
-
 COS_30 = math.sqrt(3)/2
 SIN_30 = 1/2
 
@@ -41,18 +39,6 @@ def createNutHousingPolygon(margin, s):
             [e+margin, 0],
             [margin+e_2*(1 + SIN_30), -s/2],
             [0, -s/2]]
-
-
-def saveTriangleMeshToSTL(trianglesMesh, filename):
-    vertices, faces = getVerticesAndFacesFromMesh(trianglesMesh)
-
-    _mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, f in enumerate(faces):
-        for j in range(3):
-            _mesh.vectors[i][j] = vertices[f[j], :]
-
-    # Write the mesh to file "cube.stl"
-    _mesh.save(filename + ".stl")
 
 
 class Configuration(dict):
