@@ -1,7 +1,7 @@
-#FREECAD_0_18_INSTALL_PATH = "C:\\Users\\Lucas\\AppData\\Local\\FreeCAD 0.18"
-# It has been added to the PYTHONPATH environment vairbale
+# Modificar el archivo freecad.pth a env/site-packages para que funcione la importación de FreeCAD
+# En .vscode settings.json se puede agregar "python. .analysis.extraPaths": ["<PATH TO FREECAD"] de
+# forma de que pylance reconozca los paquetes
 
-# Esta versión de FREECAD funciona con la versión 3.6 de Python
 import FreeCAD
 
 import Mesh
