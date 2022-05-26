@@ -16,6 +16,8 @@ from surfaces.motherSurface import MotherSurface
 from surfaces.shiftDecorator import ShiftDecorator
 
 from solid.operations import getShellMesh
+from solid.operations import getLeadMesh
+
 from utils.utils import Configuration
 
 TABS_HEIGHT_MARGIN = 0.1
@@ -46,7 +48,6 @@ def checkConfguration(configuration: Configuration):
 
     return result
 
-
 def generateTopBottomSurfaces(configuration: Configuration):
     def calculateSurfaceParmeters(surfaceConfig):
         zOffset = surfaceConfig.shape.zeroHeight
@@ -75,7 +76,6 @@ def generateTopBottomSurfaces(configuration: Configuration):
 
     return topSurface, bottomSurface
 
-
 def generateSurfaceSolid(configuration: Configuration,
                          topSurface: ISurface, bottomSurface: ISurface):
     dimensions = configuration.surface.dimensions
@@ -92,7 +92,6 @@ def generateSurfaceSolid(configuration: Configuration,
                                       xstart, xend, xsteps, ystart, yend, ysteps)
 
     return FreeCADUtils.convertMeshToSolid(shellTrianglesMesh)
-
 
 def generateTabsShells(configuration: Configuration,
                        topSurface: ISurface, bottomSurface: ISurface):
@@ -156,6 +155,58 @@ def generateTabsShells(configuration: Configuration,
 
             yield getExtrudedPolygon(topSurface, bottomSurface, tabPolygon)
 
+def generatePiecesCuttingSurfacesPlanes(configuration: Configuration,
+                         bottomSurface: ISurface):
+    dimensions = configuration.surface.dimensions
+    grid = configuration.manufacture.grid
+    thickness = configuration.manufacture.mold.puzzle.thickness
+    surfDims = configuration.surface.dimensions
+    puzzleConfig = configuration.manufacture.mold.puzzle
+    
+    pWidth, pHeight = puzzleConfig.pieces.width, puzzleConfig.pieces.height
+    sWidth, sDepth, sHight = surfDims.width, surfDims.depth, surfDims.height*2  # FIX IT!!
+
+    # Because of the surface's symmetry, xstart=0
+    xstart, xend, xsteps = 0, dimensions.width/2, \
+        int((dimensions.width/2)/grid.width)
+        
+    ystart, yend, ysteps = (-dimensions.depth/2), (dimensions.depth / 2), \
+        int(dimensions.depth/grid.height)
+
+    piecesX = int((sWidth/2)/pWidth)
+    piecesY = int(sDepth/pHeight)
+
+    k = 0.2
+    
+    for ix in range(1, piecesX):
+        x = ix*pWidth
+        
+        topVertices = []
+        bottomVertices = []
+        for y in  np.linspace(ystart, yend, ysteps):
+            z = bottomSurface.F([x, y])
+            n = np.append(bottomSurface.gradF([x, y]) * -1, 1)
+            n_u = n / np.linalg.norm(n)
+            
+            topVertices.append(n_u*thickness*(1+k) + [x, y, z])
+            bottomVertices.append(n_u*thickness*-k + [x, y, z])
+            
+        yield FreeCADUtils.createMesh(getLeadMesh(topVertices, bottomVertices))
+    
+    for iy in range(1, piecesY):
+        y = iy*pHeight - (sDepth/2)
+        
+        topVertices = []
+        bottomVertices = []
+        for x in  np.linspace(xstart, xend, xsteps):
+            z = bottomSurface.F([x, y])
+            n = np.append(bottomSurface.gradF([x, y]) * -1, 1)
+            n_u = n / np.linalg.norm(n)
+            
+            topVertices.append(n_u*thickness*(1+k) + [x, y, z])
+            bottomVertices.append(n_u*thickness*-k + [x, y, z])
+            
+        yield FreeCADUtils.createMesh(getLeadMesh(topVertices, bottomVertices))
 
 def generatePiecesCutPlanes(configuration: Configuration):
     surfDims = configuration.surface.dimensions
@@ -175,7 +226,6 @@ def generatePiecesCutPlanes(configuration: Configuration):
         pos = [0, iy*pHeight - (sDepth/2), 0]
         yield FreeCADUtils.createPlane(sHight, sWidth/2, pos, [0, 1, 0])
 
-
 def generateParts(configuration, topSurface, bottomSurface):
     surfaceSolid = generateSurfaceSolid(
         configuration, topSurface, bottomSurface)
@@ -184,7 +234,6 @@ def generateParts(configuration, topSurface, bottomSurface):
         configuration, topSurface, bottomSurface)
 
     return surfaceSolid, list(tabsShells)
-
 
 def generatePanelsLeads(configuration, topSurface, bottomSurface):
     surfDims = configuration.surface.dimensions
@@ -308,7 +357,6 @@ def generatePanelsLeads(configuration, topSurface, bottomSurface):
 
     return leads
 
-
 def sliceTabsFromSurface(surfaceSolid, tabsShells):
     result = FreeCADUtils.slicePart(surfaceSolid, tabsShells)
     volumeSortedResult = sorted(
@@ -316,13 +364,11 @@ def sliceTabsFromSurface(surfaceSolid, tabsShells):
 
     return volumeSortedResult[0], volumeSortedResult[1:]
 
-
 def sliceTabsAndPieces(surfaceSolid, tabsShells, planes):
     body, tabs = sliceTabsFromSurface(surfaceSolid, tabsShells)
     pieces = FreeCADUtils.slicePart(body, planes)
 
     return tabs, pieces
-
 
 def joinPiecesLeads(configuration, orderedPieces, leads):
     surfDims = configuration.surface.dimensions
@@ -347,14 +393,12 @@ def joinPiecesLeads(configuration, orderedPieces, leads):
 
     return parts
 
-
 def checkParts(parts):
     for part in parts:
         if not part.isValid():
             return False
 
     return True
-
 
 def orderElementInGrid(gridWidth, gridHeight, elements, fGridPoint, fElementPosition):
     def dist(elementPos, gridPos): return np.linalg.norm(elementPos - gridPos)
@@ -372,7 +416,6 @@ def orderElementInGrid(gridWidth, gridHeight, elements, fGridPoint, fElementPosi
 
         orderedElements.append(rowElements)
     return orderedElements
-
 
 def orderPieces(configuration, pieces, bottomSurface):
     surfDims = configuration.surface.dimensions
@@ -442,4 +485,25 @@ def run():
         raise SystemError
 
 
-run()
+#run()
+
+configuration = Configuration(config.configuration)
+
+topSurface, bottomSurface = generateTopBottomSurfaces(configuration)
+
+document = FreeCADUtils.createNewDocument()
+
+meshes = generatePiecesCuttingSurfacesPlanes(configuration, bottomSurface)
+surfaceSolid, tabsShells = generateParts(
+        configuration, topSurface, bottomSurface)
+
+FreeCADUtils.addMeshesToDocument(meshes)
+FreeCADUtils.addPartToDocument(surfaceSolid)
+
+if not os.path.exists("output"):
+    os.makedirs("output")
+    
+if os.path.exists("output/outputmesh.FCStd"):
+    os.remove("output/outputmesh.FCStd")
+
+FreeCADUtils.saveDocument(document, "output/outputmesh.FCStd")
