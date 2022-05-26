@@ -1,6 +1,5 @@
 # Modificar el archivo freecad.pth a env/site-packages para que funcione la importación de FreeCAD
-# En .vscode settings.json se puede agregar "python. .analysis.extraPaths": ["<PATH TO FREECAD"] de
-# forma de que pylance reconozca los paquetes
+# pyright: reportMissingImports=false
 
 import FreeCAD
 
@@ -11,7 +10,6 @@ import Draft
 import BOPTools.SplitAPI as SplitAPI
 
 TOLERANCE = 0.1
-
 
 def convertToPolygon(polygon, z):
     vertices = [FreeCAD.Vector(v[0], v[1], z) for v in polygon]
@@ -45,10 +43,16 @@ def convertMeshToSolid(trianglesMesh):
 
     return Part.Solid(part)
 
+def createMesh(trianglesMesh):
+    return Mesh.Mesh(trianglesMesh)
 
 def addPartsToDocument(parts):
     for part in parts:
         addPartToDocument(part)
+
+def addMeshesToDocument(meshes):
+    for mesh in meshes:
+        Mesh.show(mesh)
 
 
 def addPartToDocument(part):
