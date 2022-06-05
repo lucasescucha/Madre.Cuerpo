@@ -7,7 +7,7 @@ import config
 import numpy as np
 
 import FreeCADTools.utils as FreeCADUtils
-import svg.svgUtils as svgUtils
+import svg.utils as svgUtils
 
 from surfaces.iSurface import ISurface
 
@@ -16,7 +16,6 @@ from surfaces.motherSurface import MotherSurface
 from surfaces.shiftDecorator import ShiftDecorator
 
 from solid.operations import getShellMesh
-from solid.operations import getLeadMesh
 
 from utils.utils import Configuration
 
@@ -95,7 +94,7 @@ def generateSurfaceSolid(configuration: Configuration,
 
 def generateTabsShells(configuration: Configuration,
                        topSurface: ISurface, bottomSurface: ISurface):
-
+    
     def getExtrudedPolygon(topSurface, bottomSurface, tabPolygon):
         def getMaxMinValuesShell(topSurface, bottomSurface, points):
             def evalSurface(surface, points, f):
@@ -154,59 +153,6 @@ def generateTabsShells(configuration: Configuration,
             tabPolygon = rotPuzzleTabPolygon + position
 
             yield getExtrudedPolygon(topSurface, bottomSurface, tabPolygon)
-
-def generatePiecesCuttingSurfacesPlanes(configuration: Configuration,
-                         bottomSurface: ISurface):
-    dimensions = configuration.surface.dimensions
-    grid = configuration.manufacture.grid
-    thickness = configuration.manufacture.mold.puzzle.thickness
-    surfDims = configuration.surface.dimensions
-    puzzleConfig = configuration.manufacture.mold.puzzle
-    
-    pWidth, pHeight = puzzleConfig.pieces.width, puzzleConfig.pieces.height
-    sWidth, sDepth, sHight = surfDims.width, surfDims.depth, surfDims.height*2  # FIX IT!!
-
-    # Because of the surface's symmetry, xstart=0
-    xstart, xend, xsteps = 0, dimensions.width/2, \
-        int((dimensions.width/2)/grid.width)
-        
-    ystart, yend, ysteps = (-dimensions.depth/2), (dimensions.depth / 2), \
-        int(dimensions.depth/grid.height)
-
-    piecesX = int((sWidth/2)/pWidth)
-    piecesY = int(sDepth/pHeight)
-
-    k = 0.2
-    
-    for ix in range(1, piecesX):
-        x = ix*pWidth
-        
-        topVertices = []
-        bottomVertices = []
-        for y in  np.linspace(ystart, yend, ysteps):
-            z = bottomSurface.F([x, y])
-            n = np.append(bottomSurface.gradF([x, y]) * -1, 1)
-            n_u = n / np.linalg.norm(n)
-            
-            topVertices.append(n_u*thickness*(1+k) + [x, y, z])
-            bottomVertices.append(n_u*thickness*-k + [x, y, z])
-            
-        yield FreeCADUtils.createMesh(getLeadMesh(topVertices, bottomVertices))
-    
-    for iy in range(1, piecesY):
-        y = iy*pHeight - (sDepth/2)
-        
-        topVertices = []
-        bottomVertices = []
-        for x in  np.linspace(xstart, xend, xsteps):
-            z = bottomSurface.F([x, y])
-            n = np.append(bottomSurface.gradF([x, y]) * -1, 1)
-            n_u = n / np.linalg.norm(n)
-            
-            topVertices.append(n_u*thickness*(1+k) + [x, y, z])
-            bottomVertices.append(n_u*thickness*-k + [x, y, z])
-            
-        yield FreeCADUtils.createMesh(getLeadMesh(topVertices, bottomVertices))
 
 def generatePiecesCutPlanes(configuration: Configuration):
     surfDims = configuration.surface.dimensions
@@ -484,26 +430,4 @@ def run():
     if not (checkParts(tabs) and checkParts(pieces)):
         raise SystemError
 
-
-#run()
-
-configuration = Configuration(config.configuration)
-
-topSurface, bottomSurface = generateTopBottomSurfaces(configuration)
-
-document = FreeCADUtils.createNewDocument()
-
-meshes = generatePiecesCuttingSurfacesPlanes(configuration, bottomSurface)
-surfaceSolid, tabsShells = generateParts(
-        configuration, topSurface, bottomSurface)
-
-FreeCADUtils.addMeshesToDocument(meshes)
-FreeCADUtils.addPartToDocument(surfaceSolid)
-
-if not os.path.exists("output"):
-    os.makedirs("output")
-    
-if os.path.exists("output/outputmesh.FCStd"):
-    os.remove("output/outputmesh.FCStd")
-
-FreeCADUtils.saveDocument(document, "output/outputmesh.FCStd")
+run()
