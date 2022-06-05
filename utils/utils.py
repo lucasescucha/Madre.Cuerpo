@@ -1,11 +1,25 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
+
+from scipy.spatial.transform.rotation import Rotation
 
 COS_30 = math.sqrt(3)/2
 SIN_30 = 1/2
 
+def getUnityVector(v):
+    return v/np.linalg.norm(v)
 
+def rotateAroundAxis(v, axis, angle):
+    return Rotation.from_rotvec(angle * getUnityVector(axis)).apply(v)
+
+def getRotationAngleAndAxis(initialVector, directionVector):
+    initialVector = getUnityVector(initialVector)
+    directionVector = getUnityVector(directionVector)
+
+    axis = np.cross(initialVector, directionVector)
+    
+    return axis, np.arccos(np.clip(np.dot(initialVector, directionVector), -1.0, 1.0))
+  
 def getVerticesAndFacesFromMesh(mesh):
     vertices = []
     faces = []
