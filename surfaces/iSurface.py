@@ -7,3 +7,6 @@ class ISurface:
 
     def gradF(self, P: np.array) -> np.array:
         pass
+    
+    def arcLenght(self, direction: str, start: float, end: float) -> float:
+        pass

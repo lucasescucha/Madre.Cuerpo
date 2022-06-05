@@ -13,3 +13,6 @@ class OffsetSurface(ISurface):
 
     def gradF(self, P: np.array) -> np.array:
         raise NotImplementedError
+
+    def arcLenght(self, direction: str, start: float, end: float) -> float:
+        raise NotImplementedError
