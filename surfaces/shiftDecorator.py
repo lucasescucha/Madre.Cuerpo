@@ -22,3 +22,9 @@ class ShiftDecorator(ISurface):
     def gradF(self, P: np.array) -> np.array:
         shift = self._shift
         return self._surface.gradF(P + shift[0:2])
+
+    def arcLenght(self, direction: str, start: float, end: float) -> float:
+        return self._surface.arcLenght(direction, start, end)
+    
+    def FOffset(self, P: np.array, r: float) -> np.array:
+        return self._surface.FOffset(P, r)

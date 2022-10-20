@@ -10,3 +10,6 @@ class ISurface:
     
     def arcLenght(self, direction: str, start: float, end: float) -> float:
         pass
+
+    def FOffset(self, P: np.array, r: float) -> np.array:
+        pass

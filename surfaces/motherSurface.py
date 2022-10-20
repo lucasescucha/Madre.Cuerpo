@@ -18,8 +18,14 @@ class MotherSurface(ISurface):
     #\frac{1}{2}x\sqrt{4b^2x^2+1}+\frac{1}{4b}\ln \left|2bx+\sqrt{1+4b^2x^2}\right|+C
     def arcLenght(self, direction: str, start: float, end: float) -> float:
         def integral(k, v):
-            return 0.5*v*math.sqrt(4*(k**2)*(v**2) + 1)+(1/(4*k))*math.log(math.abs(2*k*v + math.sqrt(1+4*(k**2)*(v**2))))
+            return 0.5*v*math.sqrt(4*(k**2)*(v**2) + 1)+(1/(4*k))* \
+                math.log(abs(2*k*v + math.sqrt(1+4*(k**2)*(v**2))))
 
         k = self.a if direction == "x" else self.b 
         
         return integral(k, end) - integral(k, start)  
+    
+    def FOffset(self, P: np.array, r: float) -> np.array:
+        normal = np.append((self.gradF(P) * -1), [1])
+        hat = normal/np.linalg.norm(normal)
+        return np.append(P, [self.F(P)]) + hat*r

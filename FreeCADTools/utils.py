@@ -11,16 +11,16 @@ import BOPTools.SplitAPI as SplitAPI
 
 TOLERANCE = 0.1
 
-def convertToPolygon(polygon, z):
-    vertices = [FreeCAD.Vector(v[0], v[1], z) for v in polygon]
+def convertToPolygon(polygon):
+    vertices = [FreeCAD.Vector(v[0], v[1], v[2]) for v in polygon]
     wire = Part.makePolygon(vertices)
     return wire
 
+def toFreeCADVector(vector):
+    return FreeCAD.Vector(vector[0], vector[1], vector[2])
 
-def extrudePolygonInZ(polygon, zStart, zEnd):
-    fcPolygon = convertToPolygon(polygon, zStart)
-    return fcPolygon.extrude(FreeCAD.Vector(0, 0, zEnd - zStart))
-
+def extrudePolygon(polygon, displacement):
+    return polygon.extrude(toFreeCADVector(displacement))
 
 def createPlane(length, width, pnt, dir):
     fcPnt = FreeCAD.Vector(pnt[0], pnt[1], pnt[2])
@@ -35,6 +35,8 @@ def slicePart(part, tools):
     result = SplitAPI.slice(part, tools, "Split")
     return result.Solids
 
+def createCylinder(radius, lenght, center, direction):
+    return FreeCAD.makeCylinder(radius, lenght, toFreeCADVector(center), toFreeCADVector(direction), 360)
 
 def convertMeshToSolid(trianglesMesh):
     mesh = Mesh.Mesh(trianglesMesh)

@@ -1,13 +1,27 @@
 import numpy as np
 import math
 
+import warnings
+
+warnings.filterwarnings("error")
+
 from scipy.spatial.transform.rotation import Rotation
 
 COS_30 = math.sqrt(3)/2
 SIN_30 = 1/2
 
+def planeLineIntersection(planePoint, planeNormal, linePoint, lineDirection):
+    if np.dot(planeNormal, getUnityVector(lineDirection)) == 0:
+        return None
+    
+    t = (np.dot(planeNormal, planePoint) - np.dot(planeNormal, linePoint)) / np.dot(planeNormal, getUnityVector(lineDirection))
+    return (getUnityVector(lineDirection) * t) + linePoint
+
 def getUnityVector(v):
-    return v/np.linalg.norm(v)
+    try:
+        return v/np.linalg.norm(v)
+    except RuntimeWarning:
+        print("Error")
 
 def rotateAroundAxis(v, axis, angle):
     return Rotation.from_rotvec(angle * getUnityVector(axis)).apply(v)
@@ -35,13 +49,11 @@ def getVerticesAndFacesFromMesh(mesh):
 
     return np.array(vertices), np.array(faces)
 
-
 def getXYFromPoints(points):
     x = np.array([p[0] for p in points])
     y = np.array([p[1] for p in points])
 
     return x, y
-
 
 def createNutHousingPolygon(margin, s):
     # e/2 * cos(30°) = s/2 => e = s / cos(30°)
@@ -53,8 +65,6 @@ def createNutHousingPolygon(margin, s):
             [e+margin, 0],
             [margin+e_2*(1 + SIN_30), -s/2],
             [0, -s/2]]
-
-
 class Configuration(dict):
     def __init__(self, dictionary: dict) -> None:
         for k in dictionary:
@@ -65,6 +75,30 @@ class Configuration(dict):
     def __getattr__(self, attr: str) -> object:
         return self.get(attr)
 
+    def check(self) -> bool:
+        def checkRatio(a, b):
+            return (a/b).is_integer()
+
+        sDimensionsConfig = self.surface.dimensions
+        gridConfig = self.manufacture.grid
+        moldConfig = self.manufacture.mold
+        puzzleConfig = moldConfig.puzzle
+
+        result = True
+
+        result &= checkRatio(sDimensionsConfig.width/2, gridConfig.width)
+        result &= checkRatio(sDimensionsConfig.depth, gridConfig.height)
+
+        result &= checkRatio(sDimensionsConfig.width/2, puzzleConfig.pieces.width)
+        result &= checkRatio(sDimensionsConfig.depth, puzzleConfig.pieces.height)
+
+        piecesX = int((sDimensionsConfig.width/2)/puzzleConfig.pieces.width)
+        piecesY = int(sDimensionsConfig.depth/puzzleConfig.pieces.height)
+
+        result &= checkRatio(piecesX, moldConfig.panels.dimensions.width)
+        result &= checkRatio(piecesY, moldConfig.panels.dimensions.height)
+
+        return result
 
 def parseConfigurationValue(value):
     if not isinstance(value, str):
@@ -85,3 +119,4 @@ def parseConfigurationValue(value):
             raise NotImplementedError
     else:
         return value
+
