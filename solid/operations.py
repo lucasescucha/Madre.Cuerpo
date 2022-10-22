@@ -9,7 +9,7 @@ def getSurfaceVerticesGrid(surfaceF, xVect, yVect):
     for x in xVect:
         row_vertices = []
         for y in yVect:
-            row_vertices.append([x, y, surfaceF([x, y])])
+            row_vertices.append(surfaceF([x, y]))
         vertices.append(row_vertices)
     return vertices
 
@@ -79,16 +79,6 @@ def getShellMeshFromSurfacesVertexs(sf1Vertexs, sf2Vertexs):
 
     return mesh_triangles
 
-def getShellMesh(surface1, surface2, xstart, xend, xsteps, ystart, yend, ysteps):
-
-    xVect = np.linspace(xstart, xend, xsteps + 1)
-    yVect = np.linspace(ystart, yend, ysteps + 1)    
-
-    svg1 = getSurfaceVerticesGrid(surface1.F, xVect, yVect)
-    svg2 = getSurfaceVerticesGrid(surface2.F, xVect, yVect)
-
-    return getShellMeshFromSurfacesVertexs(svg1, svg2)
-
 def getShellMesh(surface1 : MeshSurface, surface2 : MeshSurface):
     svg1, _ = surface1.getMeshData()
     svg2, _ = surface2.getMeshData()
@@ -98,8 +88,8 @@ def getShellMesh(surface1 : MeshSurface, surface2 : MeshSurface):
 def surfaceToOffsetMeshSurface(surface: ISurface, offset, xVect, yVect):
     if surface is MeshSurface:
         raise TypeError
-        
-    surfaceF = lambda p: surface.FOffset(p, offset) if offset == 0 else surface.F
+    
+    surfaceF = lambda p: surface.FOffset(p, offset)
 
     surfaceVerticesGrid = getSurfaceVerticesGrid(surfaceF, xVect, yVect)
     surfaceTriangleMesh = getSurfaceTriangleMesh(surfaceVerticesGrid)
