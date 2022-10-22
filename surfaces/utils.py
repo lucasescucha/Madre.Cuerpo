@@ -26,5 +26,8 @@ def calculateSamplingPoints(astart: float, aend: float, surface : ISurface,
     pointsCount = math.ceil(curveLenght / gridAxisDimension)
     stepLenght = curveLenght / pointsCount 
     
+    samplingPoints = []
     for i in range(pointsCount + 1):
-        yield arcLenght2Coordinate(surface, i * stepLenght, axis, astart)
+        samplingPoints.append(arcLenght2Coordinate(surface, i * stepLenght, axis, astart))
+    
+    return samplingPoints
