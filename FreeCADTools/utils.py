@@ -36,7 +36,7 @@ def slicePart(part, tools):
     return result.Solids
 
 def createCylinder(radius, lenght, center, direction):
-    return FreeCAD.makeCylinder(radius, lenght, toFreeCADVector(center), toFreeCADVector(direction), 360)
+    return Part.makeCylinder(radius, lenght, toFreeCADVector(center), toFreeCADVector(direction), 360)
 
 def convertMeshToSolid(trianglesMesh):
     mesh = Mesh.Mesh(trianglesMesh)
