@@ -10,7 +10,9 @@ class MeshSurface(ISurface):
     def F(self, P: np.array) -> float:
         x, y = P
         
-        v1, v2, v3 = np.where(checkPointInTriangle(P, self.triangleMesh))[0]
+        filteredTriangles = list(filter(lambda tm: checkPointInTriangle(P, tm), self.triangleMesh))
+
+        v1, v2, v3 = filteredTriangles[0]
         a, b, c = np.cross(v2 - v1, v3 - v1)
         x0, y0, z0 = v1
         
