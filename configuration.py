@@ -16,13 +16,13 @@ configurationData = dict(
     manufacture=dict(
         grid=dict(
             # X axis in arc lenght units (max value)
-            width=5,
+            width=10,
             # Y axis in arc lenght units (max value)
-            height=5,
+            height=10,
         ),
         mold=dict(
             puzzle=dict(
-                thickness=3,
+                thickness=9,
                 pieces=dict(
                     # X axis in arc lenght units (max value)
                     width=50,
@@ -33,7 +33,8 @@ configurationData = dict(
                     # By default tab is y-axis oriented
                     file="svg/union.svg",
                     width=10,
-                    thickness=2
+                    baseThickness=2,
+                    flangeSize=3
                 ),
             ),
             panels=dict(
@@ -44,14 +45,14 @@ configurationData = dict(
                     height=7,
                 ),
                 leads=dict(
-                    height=20,
-                    thickness=5,
+                    height=30,
+                    thickness=8,
                     screws=2,
                     screwsDiameter=1,
-                    insertNutDiameter=2,
+                    insertNutDiameter=4,
                     insertNutDepth=3,
                     flangeSize=20,
-                    flangeScrewsDiameter=2                    
+                    flangeScrewsDiameter=3                    
                 ),
             ),
         ),
