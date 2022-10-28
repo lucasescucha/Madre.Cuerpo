@@ -76,29 +76,7 @@ class Configuration(dict):
         return self.get(attr)
 
     def check(self) -> bool:
-        def checkRatio(a, b):
-            return (a/b).is_integer()
-
-        sDimensionsConfig = self.surface.dimensions
-        gridConfig = self.manufacture.grid
-        moldConfig = self.manufacture.mold
-        puzzleConfig = moldConfig.puzzle
-
-        result = True
-
-        result &= checkRatio(sDimensionsConfig.width/2, gridConfig.width)
-        result &= checkRatio(sDimensionsConfig.depth, gridConfig.height)
-
-        result &= checkRatio(sDimensionsConfig.width/2, puzzleConfig.pieces.width)
-        result &= checkRatio(sDimensionsConfig.depth, puzzleConfig.pieces.height)
-
-        piecesX = int((sDimensionsConfig.width/2)/puzzleConfig.pieces.width)
-        piecesY = int(sDimensionsConfig.depth/puzzleConfig.pieces.height)
-
-        result &= checkRatio(piecesX, moldConfig.panels.dimensions.width)
-        result &= checkRatio(piecesY, moldConfig.panels.dimensions.height)
-
-        return result
+        return True
 
 def parseConfigurationValue(value):
     if not isinstance(value, str):
