@@ -1,8 +1,13 @@
-from core.iFunction import IFunction
 import numpy as np
 
 
-class ISurface(IFunction):
+class IFunction:
+    def F(self, P: np.array) -> float:
+        pass
+
+    def gradF(self, P: np.array) -> np.array:
+        pass
+    
     def arcLenght(self, direction: str, start: float, end: float) -> float:
         pass
 

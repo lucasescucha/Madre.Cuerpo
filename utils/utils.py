@@ -1,13 +1,39 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
 
-from stl import mesh
+import warnings
+
+warnings.filterwarnings("error")
+
+from scipy.spatial.transform.rotation import Rotation
 
 COS_30 = math.sqrt(3)/2
 SIN_30 = 1/2
 
+def planeLineIntersection(planePoint, planeNormal, linePoint, lineDirection):
+    if np.dot(planeNormal, getUnityVector(lineDirection)) == 0:
+        return None
+    
+    t = (np.dot(planeNormal, planePoint) - np.dot(planeNormal, linePoint)) / np.dot(planeNormal, getUnityVector(lineDirection))
+    return (getUnityVector(lineDirection) * t) + linePoint
 
+def getUnityVector(v):
+    try:
+        return v/np.linalg.norm(v)
+    except RuntimeWarning:
+        print("Error")
+
+def rotateAroundAxis(v, axis, angle):
+    return Rotation.from_rotvec(angle * getUnityVector(axis)).apply(v)
+
+def getRotationAngleAndAxis(initialVector, directionVector):
+    initialVector = getUnityVector(initialVector)
+    directionVector = getUnityVector(directionVector)
+
+    axis = np.cross(initialVector, directionVector)
+    
+    return axis, np.arccos(np.clip(np.dot(initialVector, directionVector), -1.0, 1.0))
+  
 def getVerticesAndFacesFromMesh(mesh):
     vertices = []
     faces = []
@@ -23,13 +49,11 @@ def getVerticesAndFacesFromMesh(mesh):
 
     return np.array(vertices), np.array(faces)
 
-
 def getXYFromPoints(points):
     x = np.array([p[0] for p in points])
     y = np.array([p[1] for p in points])
 
     return x, y
-
 
 def createNutHousingPolygon(margin, s):
     # e/2 * cos(30°) = s/2 => e = s / cos(30°)
@@ -41,20 +65,6 @@ def createNutHousingPolygon(margin, s):
             [e+margin, 0],
             [margin+e_2*(1 + SIN_30), -s/2],
             [0, -s/2]]
-
-
-def saveTriangleMeshToSTL(trianglesMesh, filename):
-    vertices, faces = getVerticesAndFacesFromMesh(trianglesMesh)
-
-    _mesh = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, f in enumerate(faces):
-        for j in range(3):
-            _mesh.vectors[i][j] = vertices[f[j], :]
-
-    # Write the mesh to file "cube.stl"
-    _mesh.save(filename + ".stl")
-
-
 class Configuration(dict):
     def __init__(self, dictionary: dict) -> None:
         for k in dictionary:
@@ -65,6 +75,8 @@ class Configuration(dict):
     def __getattr__(self, attr: str) -> object:
         return self.get(attr)
 
+    def check(self) -> bool:
+        return True
 
 def parseConfigurationValue(value):
     if not isinstance(value, str):
@@ -85,3 +97,4 @@ def parseConfigurationValue(value):
             raise NotImplementedError
     else:
         return value
+

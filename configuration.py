@@ -1,5 +1,5 @@
 # Default unit: milimeters (use Xm to use meters instead of mm)
-configuration = dict(
+configurationData = dict(
     surface=dict(
         dimensions=dict(
             # X axis
@@ -15,38 +15,44 @@ configuration = dict(
     ),
     manufacture=dict(
         grid=dict(
-            # X axis
-            width=3.33,
-            # Y axis
-            height=3.33,
+            # X axis in arc lenght units (max value)
+            width=10,
+            # Y axis in arc lenght units (max value)
+            height=10,
         ),
         mold=dict(
             puzzle=dict(
-                thickness=10,
+                thickness=9,
                 pieces=dict(
-                    # X axis
-                    width=83.25,
-                    # Y axis
-                    height=55.5,
+                    # X axis in arc lenght units (max value)
+                    width=50,
+                    # Y axis in arc lenght units (max value)
+                    height=80,
                 ),
                 tabs=dict(
                     # By default tab is y-axis oriented
                     file="svg/union.svg",
-                    width=20,
+                    width=10,
+                    baseThickness=2,
+                    flangeSize=3
                 ),
             ),
             panels=dict(
                 dimensions=dict(
                     # unit: pieces
-                    width=2,   
+                    width=5,   
                     # unit: pieces
-                    height=3,
+                    height=7,
                 ),
                 leads=dict(
-                    height=20,
-                    thickness=5,
-                    #boltsPerFace=2,
-                    #boltsDiameter=0.003,
+                    height=30,
+                    thickness=4,
+                    screws=2,
+                    screwsDiameter=1,
+                    insertNutDiameter=4,
+                    insertNutDepth=3,
+                    flangeSize=20,
+                    flangeScrewsDiameter=3                    
                 ),
             ),
         ),

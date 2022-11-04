@@ -40,8 +40,6 @@ def getPolygonFromSVGFile(filename, sampleDistance):
 
         yield getPoint(sample, iSegment)
 
-    yield getPoint(0, 0)
-
 
 def getTabJoinPolygonFromSVGFile(filename, width):
     tabJoinUnion = np.array(list(getPolygonFromSVGFile(
