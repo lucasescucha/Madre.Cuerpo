@@ -1,6 +1,5 @@
 from surfaces.offset.offsetSurface import OffsetSurface
 from surfaces.motherSurface import MotherSurface
-import numpy as np
 
 
 class MotherOffsetSurface(OffsetSurface):
