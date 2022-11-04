@@ -1,4 +1,5 @@
 import math
+from solver.solverUtils import getNormalHat
 from surfaces.iSurface import ISurface
 import numpy as np
 
@@ -26,6 +27,5 @@ class MotherSurface(ISurface):
         return integral(k, end) - integral(k, start)  
     
     def FOffset(self, P: np.array, r: float) -> np.array:
-        normal = np.append((self.gradF(P) * -1), [1])
-        hat = normal/np.linalg.norm(normal)
-        return np.append(P, [self.F(P)]) + hat*r
+        n_hat = getNormalHat(self.gradF(P))
+        return np.append(P, [self.F(P)]) + n_hat*r

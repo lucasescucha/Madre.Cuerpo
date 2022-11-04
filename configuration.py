@@ -46,7 +46,7 @@ configurationData = dict(
                 ),
                 leads=dict(
                     height=30,
-                    thickness=8,
+                    thickness=4,
                     screws=2,
                     screwsDiameter=1,
                     insertNutDiameter=4,

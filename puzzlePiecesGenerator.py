@@ -1,16 +1,19 @@
 import math
-import operator
 import os
 import shutil
+from curve.surfaceCurve import SurfaceCurve
 
 import numpy as np
 import pyclipper as clipper
 
 from solid.operations import getLeadMesh, getShellMesh, getShellMeshFromSurfacesVertexs, surfaceToMeshSurface, surfaceToOffsetMeshSurface
+from solver.offsetSolver import OffsetSolver
 from surfaces.meshSurface import MeshSurface
+from surfaces.offset.motherOffsetSurface import MotherOffsetSurface
 
 import svg.utils as svgUtils
 import surfaces.utils as sfcUtils
+from sympy import sign
 import utils.utils as utlUtils
 import FreeCADTools.utils as FreeCADUtils
 
@@ -19,22 +22,23 @@ from surfaces.iSurface import ISurface
 
 from surfaces.motherSurface import MotherSurface
 from surfaces.shiftDecorator import ShiftDecorator
-from surfaces.utils import calculateSamplingPoints
+from surfaces.utils import calculateSamplingPoints, getUnitVector
 
 from utils.utils import Configuration, rotateAroundAxis
 
 TABS_HEIGHT_MARGIN = 0.1
 
-X_VERSOR = [1, 0, 0]
-Y_VERSOR = [0, 1, 0]
-Z_VERSOR = [0, 0, 1]
+X_VERSOR = np.array([1, 0, 0])
+Y_VERSOR = np.array([0, 1, 0])
+Z_VERSOR = np.array([0, 0, 1])
 
-ZERO_VECTOR = ORIGIN = [0, 0, 0]
+ZERO_VECTOR = ORIGIN = np.array([0, 0, 0])
 
 SOLID_OPERATIONS_TOLERANCE = 0.1
 
-def generateMeshSurfaces(configuration: Configuration):
-    def calculateReferenceSurface(surfaceConfig):
+def generateSurfaces(configuration: Configuration):
+    def calculateReferenceSurface():
+        surfaceConfig = configuration.surface
         zOffset = surfaceConfig.shape.zeroHeight
 
         # z = zOffset + a*x^2 -  b*y^2
@@ -50,13 +54,26 @@ def generateMeshSurfaces(configuration: Configuration):
 
         return ShiftDecorator(MotherSurface(a, b),  np.array([0, 0, zOffset]))
 
+    thickness = configuration.manufacture.mold.puzzle.thickness
+    tabsBaseThickness = configuration.manufacture.mold.puzzle.tabs.baseThickness
+
+    baseOffset = thickness + tabsBaseThickness
+
+    referenceSurface = calculateReferenceSurface()
+    topOffsetSurface = MotherOffsetSurface(referenceSurface, thickness)
+    baseOffsetSurface = MotherOffsetSurface(referenceSurface, baseOffset)
+
+    return referenceSurface, topOffsetSurface, baseOffsetSurface
+
+def generateSurfacesMeshes(configuration: Configuration, referenceSurface: ISurface):
+
     surface = configuration.surface.dimensions
     grid = configuration.manufacture.grid
 
     thickness = configuration.manufacture.mold.puzzle.thickness
     tabsBaseThickness = configuration.manufacture.mold.puzzle.tabs.baseThickness
 
-    referenceSurface = calculateReferenceSurface(configuration.surface)
+    baseOffset = thickness + tabsBaseThickness
 
     xstart, xend = 0, surface.width/2
     xVect = calculateSamplingPoints(xstart, xend, referenceSurface, "x", grid.width)
@@ -64,14 +81,14 @@ def generateMeshSurfaces(configuration: Configuration):
     ystart, yend = (-surface.depth/2), (surface.depth / 2)
     yVect = calculateSamplingPoints(ystart, yend, referenceSurface, "y", grid.height)
 
-    bottomSurface = surfaceToMeshSurface(referenceSurface, xVect, yVect)
+    meshBottomSurface = surfaceToMeshSurface(referenceSurface, xVect, yVect)
+    meshTopSurface = surfaceToOffsetMeshSurface(referenceSurface, thickness, xVect, yVect)
+    meshBaseSurface = surfaceToOffsetMeshSurface(referenceSurface, baseOffset, xVect, yVect)
 
-    topSurface = surfaceToOffsetMeshSurface(referenceSurface, thickness, xVect, yVect)
+    surfaceMesh = getShellMesh(meshBottomSurface, meshTopSurface)
+    baseMesh = getShellMesh(meshTopSurface, meshBaseSurface)
 
-    baseOffset = thickness + tabsBaseThickness
-    baseSurface = surfaceToOffsetMeshSurface(referenceSurface, baseOffset, xVect, yVect)
-
-    return referenceSurface, bottomSurface, topSurface, baseSurface
+    return surfaceMesh, baseMesh
 
 def calculatePiecesData(referenceSurface, surfaceDimensions, 
             piecesConfiguration, axis):
@@ -88,8 +105,8 @@ def calculatePiecesData(referenceSurface, surfaceDimensions,
     pieces = math.ceil(lenght / pieceDimension)
     return start, end, pieces, lenght / pieces
 
-def getShiftedClearPoygon(surface : MeshSurface, normal, dsplModule, 
-        polygon : np.array, direction, clearence, fastVersion = True):
+def getShiftedClearPoygon(surface : ISurface, normal, dsplModule, 
+        polygon : np.array, direction, clearence, fastVersion = False):
     
     displacement = normal * dsplModule * (1 if direction == "up" else -1)
 
@@ -104,8 +121,8 @@ def getShiftedClearPoygon(surface : MeshSurface, normal, dsplModule,
     return polygon
 
 def generateTabsShells(configuration: Configuration,
-    referenceSurface : ISurface,  bottomSurface: MeshSurface, 
-    topSurface : MeshSurface, baseSurface : MeshSurface):
+    referenceSurface : ISurface,  topOffsetSurface : ISurface, 
+    baseOffsetSurface : ISurface):
     
     def getExtrudedPolygon(tabPolygon, bottomSurface, topSurface, thickness, n_u, clearence):
         bTabPolygon = getShiftedClearPoygon(bottomSurface, n_u, 
@@ -181,10 +198,10 @@ def generateTabsShells(configuration: Configuration,
             ly = (iy+1)*pieceDepthLenght
 
             tabPolygon, n_u = locateTabPolygon(puzzleTabPolygon, lx, ly, xstart, ystart)
-            tabShell = getExtrudedPolygon(tabPolygon, bottomSurface, topSurface, thickness, n_u, thickness)
+            tabShell = getExtrudedPolygon(tabPolygon, referenceSurface, topOffsetSurface, thickness, n_u, thickness)
 
             tabPolygon, n_u = locateTabPolygon(puzzleTabBasePolygon, lx, ly, xstart, ystart)
-            tabBaseShell = getExtrudedPolygon(tabPolygon, topSurface, baseSurface, thickness, n_u, thickness)
+            tabBaseShell = getExtrudedPolygon(tabPolygon, topOffsetSurface, baseOffsetSurface, thickness, n_u, thickness)
 
             yield tabShell, tabBaseShell
 
@@ -204,16 +221,15 @@ def generateTabsShells(configuration: Configuration,
             lx = (ix+1)*pieceWidthLenght
 
             tabPolygon, n_u = locateTabPolygon(puzzleTabPolygon, lx, ly, xstart, ystart)
-            tabShell = getExtrudedPolygon(tabPolygon, bottomSurface, topSurface, thickness, n_u, thickness)
+            tabShell = getExtrudedPolygon(tabPolygon, referenceSurface, topOffsetSurface, thickness, n_u, thickness)
 
             tabPolygon, n_u = locateTabPolygon(puzzleTabBasePolygon, lx, ly, xstart, ystart)
-            tabBaseShell = getExtrudedPolygon(tabPolygon, topSurface, baseSurface, thickness, n_u, thickness)
+            tabBaseShell = getExtrudedPolygon(tabPolygon, topOffsetSurface, baseOffsetSurface, thickness, n_u, thickness)
 
             yield tabShell, tabBaseShell
 
 def generatePiecesCutSurfaces(configuration: Configuration, 
-    referenceSurface : ISurface,  bottomSurface: MeshSurface, 
-    topSurface : MeshSurface):
+    referenceSurface : ISurface):
 
     def calculateTopAndBottomPoints(x, y, thickness):
         position2d = [x, y]
@@ -221,10 +237,10 @@ def generatePiecesCutSurfaces(configuration: Configuration,
         
         n_u = sfcUtils.getUnitNormalVector(referenceSurface, position2d)
         
-        bottomOffset = getShiftedClearPoygon(bottomSurface, n_u, 3*thickness, 
+        bottomOffset = getShiftedClearPoygon(referenceSurface, n_u, 3*thickness, 
                 [position3d], "down", thickness)
 
-        topOffset = getShiftedClearPoygon(topSurface, n_u, 3*thickness, 
+        topOffset = getShiftedClearPoygon(referenceSurface, n_u, 3*thickness, 
                 [position3d], "up", thickness)
             
         return [bottomOffset[0], topOffset[0]] 
@@ -244,22 +260,24 @@ def generatePiecesCutSurfaces(configuration: Configuration,
     yVect = calculateSamplingPoints(ystart, yend, referenceSurface, "y", grid.height)
 
     for ix in range(1, xPieces):
-        x = sfcUtils.arcLenght2Coordinate(referenceSurface, ix*pieceWidthLenght, "x", xstart)
+        x = sfcUtils.arcLenght2Coordinate(referenceSurface, 
+                    ix*pieceWidthLenght, "x", xstart)
         
         vertices = np.array(
-            [calculateTopAndBottomPoints(x, y, thickness) for y in yVect])
+                [calculateTopAndBottomPoints(x, y, thickness) for y in yVect])
 
-        yield getLeadMesh(vertices[:, 0], vertices[:, 1])
+        yield FreeCADUtils.createMesh(getLeadMesh(vertices[:, 0], vertices[:, 1]))
 
     for iy in range(1, yPieces):
         y = sfcUtils.arcLenght2Coordinate(referenceSurface, iy*pieceDepthLenght, "y", ystart)
         
         vertices = np.array(
-            [calculateTopAndBottomPoints(x, y, thickness) for x in xVect])
+                [calculateTopAndBottomPoints(x, y, thickness) for x in xVect])
 
-        yield getLeadMesh(vertices[:, 0], vertices[:, 1])
+        yield FreeCADUtils.createMesh(getLeadMesh(vertices[:, 0], vertices[:, 1]))
 
 def generatePanelsLeads(configuration, referenceSurface):
+    
     LEFT_LEAD, RIGHT_LEAD, TOP_LEAD, BOTTOM_LEAD = 0, 1, 2, 3
 
     TOP_FLANGE, BOTTOM_FLANGE, LEFT_FLANGE, RIGHT_FLANGE = 0, 1, 2, 3
@@ -296,27 +314,27 @@ def generatePanelsLeads(configuration, referenceSurface):
         
         if leadSide == LEFT_LEAD:
             if flangePosition == TOP_FLANGE:
-                t = getTangentVector(p0, "y", TOP_DIRECTION)
+                t = getAxisTangentVector(p0, "y", TOP_DIRECTION)
             elif flangePosition == BOTTOM_FLANGE:
-                t = getTangentVector(p0, "x", LEFT_DIRECTION)
+                t = getAxisTangentVector(p0, "x", LEFT_DIRECTION)
         
         if leadSide == RIGHT_LEAD:
             if flangePosition == TOP_FLANGE:
-                t = getTangentVector(p0, "x", RIGHT_DIRECTION)
+                t = getAxisTangentVector(p0, "x", RIGHT_DIRECTION)
             elif flangePosition == BOTTOM_FLANGE:
-                t = getTangentVector(p0, "y", BOTTOM_DIRECTION)
+                t = getAxisTangentVector(p0, "y", BOTTOM_DIRECTION)
               
         if leadSide == TOP_LEAD:
             if flangePosition == LEFT_FLANGE:
-                t = getTangentVector(p0, "y", TOP_DIRECTION)
+                t = getAxisTangentVector(p0, "y", TOP_DIRECTION)
             elif flangePosition == RIGHT_FLANGE:
-                t = getTangentVector(p0, "x", RIGHT_DIRECTION)
+                t = getAxisTangentVector(p0, "x", RIGHT_DIRECTION)
         
         if leadSide == BOTTOM_LEAD:
             if flangePosition == LEFT_FLANGE:
-                t = getTangentVector(p0, "x", LEFT_DIRECTION)
+                t = getAxisTangentVector(p0, "x", LEFT_DIRECTION)
             elif flangePosition == RIGHT_FLANGE:
-                t = getTangentVector(p0, "y", BOTTOM_DIRECTION)
+                t = getAxisTangentVector(p0, "y", BOTTOM_DIRECTION)
 
         offsetNedeed = \
             (leadSide == LEFT_LEAD and flangePosition == TOP_FLANGE) or \
@@ -334,20 +352,23 @@ def generatePanelsLeads(configuration, referenceSurface):
         return d1, d2
 
     def getOffsetPoints(points, r):
-        return [referenceSurface.FOffset(p, r) for p in points]
+        return np.array([referenceSurface.FOffset(p, r) for p in points])
 
-    def getTangentVector(p, axis, direction):
+    def getAxisTangentVector(p, axis, direction):
         grad = np.abs(referenceSurface.gradF(p))
         t = np.array([1, 0, grad[0]] if axis == "x" else [0, 1, grad[1]]) * direction
         t_hat = t/np.linalg.norm(t)
         
         return t_hat
 
-    def extendVertices(vertices, axis, direction, distance):
-        return [(v + (getTangentVector(v[0:2], axis, direction)*distance)) 
-                for v in vertices]
+    def extendVerticesWithVector(vertices, vector, distance):
+        return np.array([(v + vector*distance) for v in vertices])
 
-    def getLeadPieceScrewsDrills(mainAxis, malstart, malend, salStart, 
+    def extendVertices(vertices, axis, direction, distance):
+        return np.array([(v + (getAxisTangentVector(v[0:2], axis, direction)*distance)) 
+                for v in vertices])
+
+    def getSidePieceScrewsDrills(mainAxis, malstart, malend, salStart, 
                         saDir, isPiece = True):
 
         secondaryAxis = "y" if mainAxis == "x" else "x"
@@ -368,7 +389,7 @@ def generatePanelsLeads(configuration, referenceSurface):
 
             pos = [ma_pos, sa_pos] if mainAxis == "x" else [sa_pos, ma_pos]
 
-            drillDirection = getTangentVector(pos, secondaryAxis, saDir)
+            drillDirection = getAxisTangentVector(pos, secondaryAxis, saDir)
             drillCenter = getOffsetPoints([pos], moldThickness - (leadHeight/2))[0]
 
             if isPiece:
@@ -397,8 +418,43 @@ def generatePanelsLeads(configuration, referenceSurface):
 
         return FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
 
-    def getLeadMeshAndDrills(mainAxis, malStart, malEnd, salStart, saDir):
+    def getSideCoreMeshAndDrills(mainAxis, malStart, malEnd, salStart, saDir):
+        def getSideCore(secondaryAxis, samplingPoints):
+            mainAxisIndex = 0 if mainAxis == "x" else 1
+            secAxisIndex = 1 if mainAxis == "x" else 0
+
+            secAxisValue = samplingPoints[0, secAxisIndex]
+            solver = OffsetSolver(
+                SurfaceCurve(referenceSurface, mainAxis, secAxisValue))
+
+            ar0Vertices = getOffsetPoints(samplingPoints, moldThickness)
+            arefVertices = ar2Vertices = getOffsetPoints(samplingPoints, 0)
+            
+            ar3Vertices = np.empty_like(arefVertices)
+            for i in range(len(samplingPoints)):
+                sp = samplingPoints[i]
+                offsetZ = solver.getOffsetFunctionZ(
+                    [sp[mainAxisIndex]], -leadHeight)
+                ar3Vertices[i, :] = np.append(sp, [offsetZ])
+
+            aSideFace = [ar0Vertices, arefVertices, ar2Vertices, ar3Vertices]
+            
+            br0Vertices = extendVertices(ar0Vertices, secondaryAxis, saDir, leadThickness)
+            brefVertices = extendVertices(arefVertices, secondaryAxis, saDir, leadThickness)
+            
+            vector = (X_VERSOR if secondaryAxis=="x" else Y_VERSOR) * saDir
+            
+            br2Vertices = extendVerticesWithVector(ar2Vertices, vector, leadThickness)
+            br3Vertices = extendVerticesWithVector(ar3Vertices, vector, leadThickness)
+
+            bSideFace = [br0Vertices, brefVertices, br2Vertices, br3Vertices]
+
+            return getShellMeshFromSurfacesVertexs(aSideFace, bSideFace)
+
         secondaryAxis = "y" if mainAxis == "x" else "x"
+
+        mainAxisIndex = 0 if mainAxis == "x" else 1
+        secondaryAxisIndex = 0 if secondaryAxis == "x" else 1
 
         pa_start = xstart if mainAxis == "x" else ystart
         sa_start = xstart if secondaryAxis == "x" else ystart
@@ -415,28 +471,16 @@ def generatePanelsLeads(configuration, referenceSurface):
 
         mainAxisVect = calculateSamplingPoints(mpa_start, mpa_end, 
                             referenceSurface, mainAxis, gridDim)
-
-        if mainAxis == "x":
-            points = [[x, secondaryAxisPoint] for x in mainAxisVect]
-        else:
-            points = [[secondaryAxisPoint, y] for y in mainAxisVect]
-
-        rt = moldThickness
-        rb = moldThickness - leadHeight
-
-        topVertices = getOffsetPoints(points, rt)
-        bottomVertices = getOffsetPoints(points, rb)
-
-        leadAFace = [topVertices, bottomVertices]
         
-        eTopVertices = extendVertices(topVertices, secondaryAxis, saDir, leadThickness)
-        eBottomVertices = extendVertices(bottomVertices, secondaryAxis, saDir, leadThickness)
+        samplingPoints = np.zeros((len(mainAxisVect), 2))
 
-        leadBFace = [eTopVertices, eBottomVertices]
+        samplingPoints[:, mainAxisIndex] = mainAxisVect[:]
+        samplingPoints[:, secondaryAxisIndex] = secondaryAxisPoint
+        
+        coreSideMesh = getSideCore(secondaryAxis, samplingPoints)
+        sideDrills = getSidePieceScrewsDrills(mainAxis, malStart, malEnd, salStart, saDir, isPiece=False)
 
-        drills = getLeadPieceScrewsDrills(mainAxis, malStart, malEnd, salStart, saDir, isPiece=False)
-
-        return [getShellMeshFromSurfacesVertexs(leadAFace, leadBFace), drills]
+        return [[coreSideMesh, coreSideMesh], sideDrills]
 
     def getFlangeMeshAndDrill(leadSide, flangePosition, flangeType, lx, ly):
         if leadSide == LEFT_LEAD or leadSide == RIGHT_LEAD:
@@ -487,10 +531,10 @@ def generatePanelsLeads(configuration, referenceSurface):
                 lxstart = ix*pieceWidthLenght
                 
                 leftLeadAndDrills.append(
-                    getLeadMeshAndDrills("y", lystart, lyend, lxstart, LEFT_DIRECTION))  
+                    getSideCoreMeshAndDrills("y", lystart, lyend, lxstart, LEFT_DIRECTION))  
 
                 piecesDrills.extend(
-                    getLeadPieceScrewsDrills("y", lystart, lyend, lxstart, LEFT_DIRECTION))     
+                    getSidePieceScrewsDrills("y", lystart, lyend, lxstart, LEFT_DIRECTION))     
             else:
                 if topSide:
                     #agregar oreja a 90° arriba a la izquierda sólo a top 
@@ -506,10 +550,10 @@ def generatePanelsLeads(configuration, referenceSurface):
                 lxstart = (ix+1)*pieceWidthLenght
 
                 rightLeadAndDrills.append(
-                    getLeadMeshAndDrills("y", lystart, lyend, lxstart, RIGHT_DIRECTION))
+                    getSideCoreMeshAndDrills("y", lystart, lyend, lxstart, RIGHT_DIRECTION))
                 
                 piecesDrills.extend(
-                    getLeadPieceScrewsDrills("y", lystart, lyend, lxstart, RIGHT_DIRECTION))     
+                    getSidePieceScrewsDrills("y", lystart, lyend, lxstart, RIGHT_DIRECTION))     
             else:
                 if topSide:
                     #agregar oreja a 90° arriba a la derecha sólo a top 
@@ -528,10 +572,10 @@ def generatePanelsLeads(configuration, referenceSurface):
                 lystart = (iy+1)*pieceDepthLenght
 
                 topLeadAndDrills.append(
-                    getLeadMeshAndDrills("x", lxstart, lxend, lystart, TOP_DIRECTION))
+                    getSideCoreMeshAndDrills("x", lxstart, lxend, lystart, TOP_DIRECTION))
                 
                 piecesDrills.extend(
-                    getLeadPieceScrewsDrills("x", lxstart, lxend, lystart, TOP_DIRECTION))     
+                    getSidePieceScrewsDrills("x", lxstart, lxend, lystart, TOP_DIRECTION))     
             else:
                 if leftSide:
                     #agregar oreja a 90° arriba a la izquierda sólo a left
@@ -547,10 +591,10 @@ def generatePanelsLeads(configuration, referenceSurface):
                 lystart = iy*pieceDepthLenght
 
                 bottomLeadAndDrills.append(
-                    getLeadMeshAndDrills("x", lxstart, lxend, lystart, BOTTOM_DIRECTION))
+                    getSideCoreMeshAndDrills("x", lxstart, lxend, lystart, BOTTOM_DIRECTION))
 
                 piecesDrills.extend(
-                    getLeadPieceScrewsDrills("x", lxstart, lxend, lystart, BOTTOM_DIRECTION))
+                    getSidePieceScrewsDrills("x", lxstart, lxend, lystart, BOTTOM_DIRECTION))
             else:
                 if leftSide:
                     #agregar oreja a 90° abajo a la izquierda sólo a left 
@@ -616,21 +660,18 @@ def run():
     if not configuration.check():
         raise ArithmeticError
 
-    referenceSurface, bottomSurface, topSurface, baseSurface = \
-        generateMeshSurfaces(configuration)
-
-    surfaceTriangleMesh = getShellMesh(bottomSurface, topSurface)
-    #baseTriangleMesh = getShellMesh(topSurface, baseSurface)
+    referenceSurface, topOffsetSurface, baseOffsetSurface = generateSurfaces(configuration)
+    
+    surfaceMesh, baseMesh = generateSurfacesMeshes(configuration, referenceSurface)
 
     document = FreeCADUtils.createNewDocument()
 
-    surfaceSolid = FreeCADUtils.convertMeshToSolid(surfaceTriangleMesh)
-    #baseSolid = FreeCADUtils.convertMeshToSolid(baseTriangleMesh)
+    surfaceSolid = FreeCADUtils.convertMeshToSolid(surfaceMesh)
+    #baseSolid = FreeCADUtils.convertMeshToSolid(baseMesh)
 
     FreeCADUtils.addPartsToDocument([surfaceSolid])
 
-    #tabsShells = generateTabsShells(configuration, referenceSurface,  bottomSurface, 
-    #            topSurface, baseSurface)
+    tabsShells = generateTabsShells(configuration, referenceSurface, topOffsetSurface, baseOffsetSurface)
     
     tabsShells = []
     tabsSolid = []
@@ -659,17 +700,22 @@ def run():
     leadsAndDrills, piecesDrills = generatePanelsLeads(configuration, referenceSurface)
     for leadAndDrills in leadsAndDrills:
         for leadElement in leadAndDrills:
-            mesh = FreeCADUtils.convertMeshToSolid(leadElement[0])
-            FreeCADUtils.addPartsToDocument([mesh])
+            if len(leadElement[0])==2:
+                mesh = FreeCADUtils.convertMeshToSolid(leadElement[0][0])
+                FreeCADUtils.addPartsToDocument([mesh])
+                mesh = FreeCADUtils.convertMeshToSolid(leadElement[0][1])
+                FreeCADUtils.addPartsToDocument([mesh])
             #FreeCADUtils.addPartsToDocument(leadElement[1])
 
     #for pieceDrills in piecesDrills:
         #body = body.cut(pieceDrills)
         #FreeCADUtils.addPartsToDocument([pieceDrills])
 
-    #cutSurfaces = generatePiecesCutSurfaces(configuration, referenceSurface, bottomSurface, topSurface)
+    surfaces = generatePiecesCutSurfaces(configuration, referenceSurface)
+    
+    FreeCADUtils.addMeshesToDocument(surfaces)
 
-    #cutSurfacesMesh = [FreeCADUtils.createMesh(cs) for cs in cutSurfaces]
+    
 
     #pieces = FreeCADUtils.slicePart(body, cutSurfacesMesh)
 

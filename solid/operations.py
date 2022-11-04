@@ -97,4 +97,12 @@ def surfaceToOffsetMeshSurface(surface: ISurface, offset, xVect, yVect):
     return MeshSurface(surfaceVerticesGrid, surfaceTriangleMesh)
 
 def surfaceToMeshSurface(surface: ISurface, xVect, yVect):
-    return surfaceToOffsetMeshSurface(surface, 0, xVect, yVect)
+    if surface is MeshSurface:
+        raise TypeError
+
+    sf = lambda p : np.append(p, [surface.F(p)]) 
+
+    surfaceVerticesGrid = getSurfaceVerticesGrid(sf, xVect, yVect)
+    surfaceTriangleMesh = getSurfaceTriangleMesh(surfaceVerticesGrid)
+
+    return MeshSurface(surfaceVerticesGrid, surfaceTriangleMesh)
