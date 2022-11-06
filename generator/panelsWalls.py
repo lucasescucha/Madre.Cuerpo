@@ -24,13 +24,13 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
 
     moldThickness = moldConfig.puzzle.thickness
 
-    leadHeight = moldConfig.panels.leads.height
-    leadThickness = moldConfig.panels.leads.thickness
-    flangeSize = moldConfig.panels.leads.flangeSize
-    leadScrews = moldConfig.panels.leads.screws
-    leadScrewsDiameter = moldConfig.panels.leads.screwsDiameter
-    pieceInsertNutDiameter = moldConfig.panels.leads.insertNutDiameter
-    pieceInsertNutDepth = moldConfig.panels.leads.insertNutDepth
+    wallHeight = moldConfig.panels.walls.height
+    wallThickness = moldConfig.panels.walls.thickness
+    flangeSize = moldConfig.panels.walls.flangeSize
+    wallScrews = moldConfig.panels.walls.screws
+    wallScrewsDiameter = moldConfig.panels.walls.screwsDiameter
+    pieceInsertNutDiameter = moldConfig.panels.walls.insertNutDiameter
+    pieceInsertNutDepth = moldConfig.panels.walls.insertNutDepth
 
     grid = configuration.manufacture.grid
 
@@ -44,45 +44,42 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         n_u = sfcUtils.getUnitNormalVector(referenceSurface, p)
         
         if flangeType == CORNER_FLANGE:
-            if wallSide == LEFT_WALL:
-                if flangePosition == TOP_FLANGE:
-                    t = getAxisTangentVector(p, "y", TOP_DIRECTION)
-                elif flangePosition == BOTTOM_FLANGE:
-                    t = getAxisTangentVector(p, "x", LEFT_DIRECTION)
             
-            #
-            if wallSide == RIGHT_WALL:
+            if wallSide == LEFT_WALL:
+                e1 = getExtensionVector(LEFT_WALL, p)
                 if flangePosition == TOP_FLANGE:
-                    ###
-                    e1 = getExtensionVector(TOP_WALL, p)
-                    e2 = getExtensionVector(RIGHT_WALL, p)
-                    t = sfcUtils.getUnitVector(e1+e2)
-                    #t = getAxisTangentVector(p, "x", RIGHT_DIRECTION)
+                    e2 = getExtensionVector(TOP_WALL, p)
                 elif flangePosition == BOTTOM_FLANGE:
-                    t = getAxisTangentVector(p, "y", BOTTOM_DIRECTION)
+                    e2 = getExtensionVector(BOTTOM_WALL, p)
+            
+            if wallSide == RIGHT_WALL:
+                e1 = getExtensionVector(RIGHT_WALL, p)
+                if flangePosition == TOP_FLANGE:
+                    e2 = getExtensionVector(TOP_WALL, p)
+                elif flangePosition == BOTTOM_FLANGE:
+                    e2 = getExtensionVector(BOTTOM_WALL, p)
                 
             if wallSide == TOP_WALL:
+                e1 = getExtensionVector(TOP_WALL, p)
                 if flangePosition == LEFT_FLANGE:
-                    t = getAxisTangentVector(p, "y", TOP_DIRECTION)
+                    e2 = getExtensionVector(LEFT_WALL, p)
                 elif flangePosition == RIGHT_FLANGE:
-                    ####
-                    d1 = getExtensionVector(TOP_WALL, p)
-                    d1 = getExtensionVector(RIGHT_WALL, p)
-                    #t = getAxisTangentVector(p, "x", RIGHT_DIRECTION)
+                    e2 = getExtensionVector(RIGHT_WALL, p)
             
             if wallSide == BOTTOM_WALL:
+                e1 = getExtensionVector(BOTTOM_WALL, p)
                 if flangePosition == LEFT_FLANGE:
-                    t = getAxisTangentVector(p, "x", LEFT_DIRECTION)
+                    e2 = getExtensionVector(LEFT_WALL, p)
                 elif flangePosition == RIGHT_FLANGE:
-                    t = getAxisTangentVector(p, "y", BOTTOM_DIRECTION)
-
+                    e2 = getExtensionVector(RIGHT_WALL, p)
+            
             offsetNedeed = \
                 (wallSide == LEFT_WALL and flangePosition == TOP_FLANGE) or \
                 (wallSide == RIGHT_WALL and flangePosition == BOTTOM_FLANGE) or \
                 (wallSide == TOP_WALL and flangePosition == RIGHT_FLANGE) or \
                 (wallSide == BOTTOM_WALL and flangePosition == LEFT_FLANGE)
             
-            d1 = rotateAroundAxis(t, n_u, np.pi/4)
+            d1 = sfcUtils.getUnitVector(e1+e2)
             d2 = rotateAroundAxis(d1, n_u, np.pi/2 if offsetNedeed else -np.pi/2)
 
             return d1, d2
@@ -172,9 +169,9 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         sa_pos = sfcUtils.arcLenght2Coordinate(
                 referenceSurface, salStart, secondaryAxis, sa_start)
 
-        ldrills = (malEnd-malStart)/(leadScrews+1)
+        ldrills = (malEnd-malStart)/(wallScrews+1)
  
-        for i in range(leadScrews):
+        for i in range(wallScrews):
             ldrill = malStart + (i+1)*ldrills 
             
             ma_pos = sfcUtils.arcLenght2Coordinate(
@@ -183,30 +180,30 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
             pos = [ma_pos, sa_pos] if mainAxis == "x" else [sa_pos, ma_pos]
 
             drillDirection = getExtensionVector(wallSide, pos)
-            drillCenter = getOffsetPoints([pos], moldThickness - (leadHeight/2))[0]
+            drillCenter = getOffsetPoints([pos], moldThickness - (wallHeight/2))[0]
 
             if isPiece:
                 drillCenter = drillCenter - drillDirection * pieceInsertNutDepth
                 drillDepth = 2 * pieceInsertNutDepth
                 drillRadius = pieceInsertNutDiameter/2
             else:
-                drillCenter = drillCenter - drillDirection * leadThickness
-                drillDepth = 3 * leadThickness
-                drillRadius = leadScrewsDiameter/2
+                drillCenter = drillCenter - drillDirection * wallThickness
+                drillDepth = 3 * wallThickness
+                drillRadius = wallScrewsDiameter/2
 
             yield FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
 
     def getFlangeScrewDirll(wallSide, flangePosition, flangeType, lx, ly):
-        drillDepth = 3*leadThickness
-        drillRadius = leadScrewsDiameter/2
+        drillDepth = 3*wallThickness
+        drillRadius = wallScrewsDiameter/2
 
         p0 = sfcUtils.arcLenght2Coordinates(referenceSurface, [lx, ly], [xstart, ystart])
 
-        v0 = getOffsetPoints([p0], moldThickness - (leadHeight/2))[0]
+        v0 = getOffsetPoints([p0], moldThickness - (wallHeight/2))[0]
 
         d1, d2 = getFlangeDirections(wallSide, flangePosition, flangeType, p0)
 
-        drillCenter = v0 + (d1 * flangeSize/2) - (d2 * leadThickness)
+        drillCenter = v0 + (d1 * flangeSize/2) - (d2 * wallThickness)
         drillDirection = d2 
 
         return FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
@@ -214,7 +211,7 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
     def getCoreWallMeshAndDrills(wallSide, lx, ly):
         def extendVertices(samplingPoint, vertices):
             for i in range(len(samplingPoint)):
-                yield vertices[i] + getExtensionVector(wallSide, samplingPoint[i])*leadThickness
+                yield vertices[i] + getExtensionVector(wallSide, samplingPoint[i])*wallThickness
 
         mainAxis, secondaryAxis, malStart, malEnd, salStart = \
             getAxisParameters(wallSide, lx, ly)
@@ -241,7 +238,7 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
             samplingPoints = list([[secondaryAxisPoint, y] for y in mainAxisVect])
 
         rt = moldThickness
-        rb = moldThickness - leadHeight
+        rb = moldThickness - wallHeight
 
         topVertices = getOffsetPoints(samplingPoints, rt)
         bottomVertices = getOffsetPoints(samplingPoints, rb)
@@ -269,7 +266,7 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         p0 = sfcUtils.arcLenght2Coordinates(referenceSurface, [lx, ly], [xstart, ystart])
 
         rt = moldThickness
-        rb = moldThickness - leadHeight
+        rb = moldThickness - wallHeight
 
         d1, d2 = getFlangeDirections(wallSide, flangePosition, flangeType, p0)
 
@@ -277,12 +274,12 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         v0b = v0a + d1 * flangeSize
         
         if flangeType == MIDDLE_FLANGE:
-            p0[axisIndex] = p0[axisIndex] + (d2 * leadThickness)[axisIndex]
+            p0[axisIndex] = p0[axisIndex] + (d2 * wallThickness)[axisIndex]
             v1a = [getOffsetPoints([p0], rb)[0], getOffsetPoints([p0], rt)[0]]        
         else:
-            v1a = v0a + d2 * leadThickness
+            v1a = v0a + d2 * wallThickness
 
-        v1b = v0b + d2 * leadThickness
+        v1b = v0b + d2 * wallThickness
         
         drill = getFlangeScrewDirll(wallSide, flangePosition, flangeType, lx, ly)
 
@@ -413,3 +410,18 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
             checkAndAppend(bottomLeadAndDrills)
 
     return leadsAndDrills, piecesDrills
+
+def generatePanelsParts(configuration: Configuration, referenceSurface: ISurface):
+    wallsAndDrills, piecesDrills = generatePanelsWalls(configuration, referenceSurface)
+    
+    for wallAndDrills in wallsAndDrills:
+        wallSolids = []
+        for wallElements in wallAndDrills:
+            wallElement, wallDrills = wallElements
+            wallSolid = FreeCADUtils.convertMeshToSolid(wallElement)
+
+            for wallDrill in wallDrills:
+                wallSolid = wallSolid.cut(wallDrill)
+
+            wallSolids.append(wallSolid)
+        

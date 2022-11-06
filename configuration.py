@@ -44,7 +44,7 @@ configurationData = dict(
                     # unit: pieces
                     height=7,
                 ),
-                leads=dict(
+                walls=dict(
                     height=30,
                     thickness=4,
                     screws=2,
