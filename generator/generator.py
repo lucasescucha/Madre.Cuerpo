@@ -1,4 +1,5 @@
-from generator.panelsWalls import generatePanelsWalls
+from decimal import InvalidOperation
+from generator.panelsWalls import generatePanelsParts
 from generator.pieces import generatePiecesCutSurfaces
 from generator.surfaces import generateSurfaces, generateSurfacesMeshes
 from generator.tabs import generateTabsShells
@@ -7,65 +8,56 @@ from utils.utils import Configuration
 import FreeCADTools.utils as FreeCADUtils
 
 def generateElements(configuration: Configuration):
-    referenceSurface, topOffsetSurface, baseOffsetSurface = generateSurfaces(configuration)
-    
-    surfaceMesh, baseMesh = generateSurfacesMeshes(configuration, referenceSurface)
+    def sliceAndGetSorteredResult(part, tool):
+        sliceResult = FreeCADUtils.slicePart(part, [tool])
+        
+        if len(sliceResult) != 2:
+            raise InvalidOperation
+        
+        if sliceResult[0].Volume > sliceResult[1].Volume:
+            return sliceResult[0], sliceResult[1]
+        else:
+            return sliceResult[1], sliceResult[0]
 
+    referenceSurface, topOffsetSurface, baseOffsetSurface = \
+        generateSurfaces(configuration)
+    
     document = FreeCADUtils.createNewDocument()
 
-    surfaceSolid = FreeCADUtils.convertMeshToSolid(surfaceMesh)
-    #baseSolid = FreeCADUtils.convertMeshToSolid(baseMesh)
+    print("Creando superficies")
+    surfaceMesh, baseMesh = generateSurfacesMeshes(configuration, referenceSurface)
 
-    FreeCADUtils.addPartsToDocument([surfaceSolid])
+    body = FreeCADUtils.convertMeshToSolid(surfaceMesh)
+    base = FreeCADUtils.convertMeshToSolid(baseMesh)
 
-    tabsShells = generateTabsShells(configuration, referenceSurface, topOffsetSurface, baseOffsetSurface)
-    
-    tabsShells = []
-    tabsSolid = []
+    # print("Creando tabs")
+    # tabsShells = list(generateTabsShells(configuration, 
+    #     referenceSurface, topOffsetSurface, baseOffsetSurface))
 
-    body = surfaceSolid
+    # for tabShell, tabBaseShell in tabsShells:
+    #     tabShellMesh = FreeCADUtils.convertMeshToSolid(tabShell)
+    #     body, tab = sliceAndGetSorteredResult(body, tabShellMesh)
 
-    for shell in tabsShells:
-        #FreeCADUtils.addMeshesToDocument([FreeCADUtils.createMesh(shell[0])])
-        #result = FreeCADUtils.slicePart(body, [FreeCADUtils.createMesh(shell[0])])
-        pass
-        #volumeSortedResult = sorted(
-        #    result, key=operator.attrgetter("Volume"), reverse=True)
+    #     tabShellMesh = FreeCADUtils.convertMeshToSolid(tabBaseShell)
+    #     _, tabBase = sliceAndGetSorteredResult(base, tabShellMesh)
         
-        #body, tab = volumeSortedResult[0], volumeSortedResult[1:]
+    #     tab = tab.fuse(tabBase)
 
-        #FreeCADUtils.addMeshesToDocument([FreeCADUtils.createMesh(shell[1])])
-        #result = FreeCADUtils.slicePart(baseSolid, [FreeCADUtils.createMesh(shell[1])])
+    #     print("Tab creado")
+    #     FreeCADUtils.addPartToDocument(tab)
 
-        #volumeSortedResult = sorted(
-        #    result, key=operator.attrgetter("Volume"), reverse=True)
+    # print("Creando paredes y perforaciones")
+    # walls, drills = generatePanelsParts(configuration, referenceSurface)
+    # FreeCADUtils.addPartsToDocument(walls)
 
-        #_, baseTab = volumeSortedResult[0], volumeSortedResult[1:]
-
-        #tabsSolid.append(tab.fuse(baseTab))
-
-    leadsAndDrills, piecesDrills = generatePanelsWalls(configuration, referenceSurface)
-    for leadAndDrills in leadsAndDrills:
-        for leadElement in leadAndDrills:
-            mesh = FreeCADUtils.convertMeshToSolid(leadElement[0])
-            FreeCADUtils.addPartsToDocument([mesh])
-
-    #for pieceDrills in piecesDrills:
-        #body = body.cut(pieceDrills)
-        #FreeCADUtils.addPartsToDocument([pieceDrills])
-
-    surfaces = generatePiecesCutSurfaces(configuration, referenceSurface)
+    # print("Perforando superficie")
+    #for drill in drills:
+    #    body = body.cut(drill)
     
-    FreeCADUtils.addMeshesToDocument(surfaces)
-
-    
-
-    #pieces = FreeCADUtils.slicePart(body, cutSurfacesMesh)
-
-    #FreeCADUtils.addPartsToDocument(tabsSolid)
-    #FreeCADUtils.addPartsToDocument(leadsSolids)
-    #FreeCADUtils.addMeshesToDocument(cutSurfacesMesh)
+    print("Creando planos y cortando superficie")
+    cutSurfaces = list(generatePiecesCutSurfaces(configuration, referenceSurface))
+    FreeCADUtils.addPartsToDocument(cutSurfaces)
+    FreeCADUtils.addPartToDocument(body)
+    #FreeCADUtils.addPartsToDocument(FreeCADUtils.slicePart(body, cutSurfaces))
 
     return document
-
-

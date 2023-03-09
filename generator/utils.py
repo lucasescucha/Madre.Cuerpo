@@ -29,12 +29,12 @@ def calculatePiecesData(referenceSurface, surfaceDimensions,
     return start, end, pieces, lenght / pieces
 
 def getShiftedClearPoygon(surface : ISurface, normal, dsplModule, 
-        polygon : np.array, direction, clearence, fastVersion = False):
+        polygon : np.array, direction, clearence, fastVersion = True):
     
     displacement = normal * dsplModule * (1 if direction == "up" else -1)
 
     if fastVersion:
-        return polygon + 2*displacement
+        return polygon + 1*displacement
 
     comparer = lambda polp, sfcp: (polp > (sfcp+clearence) if direction == "up" else  polp < (sfcp-clearence))
 

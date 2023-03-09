@@ -9,6 +9,8 @@ from surfaces.iSurface import ISurface
 from surfaces.utils import calculateSamplingPoints
 from utils.utils import Configuration
 
+SAMPLING_POINTS_EXTRA_STEPS = 4
+GRID_SIZE_FACTOR = 0.6
 
 def generatePiecesCutSurfaces(configuration: Configuration, 
     referenceSurface : ISurface):
@@ -35,11 +37,13 @@ def generatePiecesCutSurfaces(configuration: Configuration,
 
     xstart, xend, xPieces, pieceWidthLenght = calculatePiecesData(referenceSurface, 
         surfDims, puzzleConfig.pieces, "x")
-    xVect = calculateSamplingPoints(xstart, xend, referenceSurface, "x", grid.width)
+    xVect = calculateSamplingPoints(xstart, xend, referenceSurface, "x", 
+                grid.width*GRID_SIZE_FACTOR, SAMPLING_POINTS_EXTRA_STEPS)
     
     ystart, yend, yPieces, pieceDepthLenght = calculatePiecesData(referenceSurface, 
         surfDims, puzzleConfig.pieces, "y")
-    yVect = calculateSamplingPoints(ystart, yend, referenceSurface, "y", grid.height)
+    yVect = calculateSamplingPoints(ystart, yend, referenceSurface, "y", 
+                grid.height*GRID_SIZE_FACTOR, SAMPLING_POINTS_EXTRA_STEPS)
 
     for ix in range(1, xPieces):
         x = sfcUtils.arcLenght2Coordinate(referenceSurface, 
@@ -48,7 +52,7 @@ def generatePiecesCutSurfaces(configuration: Configuration,
         vertices = np.array(
                 [calculateTopAndBottomPoints(x, y, thickness) for y in yVect])
 
-        yield FreeCADUtils.createMesh(getLeadMesh(vertices[:, 0], vertices[:, 1]))
+        yield FreeCADUtils.convertMeshToSolid(getLeadMesh(vertices[:, 0], vertices[:, 1]))
 
     for iy in range(1, yPieces):
         y = sfcUtils.arcLenght2Coordinate(referenceSurface, iy*pieceDepthLenght, "y", ystart)
@@ -56,5 +60,5 @@ def generatePiecesCutSurfaces(configuration: Configuration,
         vertices = np.array(
                 [calculateTopAndBottomPoints(x, y, thickness) for x in xVect])
 
-        yield FreeCADUtils.createMesh(getLeadMesh(vertices[:, 0], vertices[:, 1]))
+        yield FreeCADUtils.convertMeshToSolid(getLeadMesh(vertices[:, 0], vertices[:, 1]))
 

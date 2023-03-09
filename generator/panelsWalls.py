@@ -2,8 +2,8 @@ import numpy as np
 import surfaces.utils as sfcUtils
 import FreeCADTools.utils as FreeCADUtils
 
-from generator.utils import calculatePiecesData
-from utils.utils import Configuration, rotateAroundAxis
+from generator.utils import Z_VERSOR, calculatePiecesData
+from utils.utils import Configuration, generateNutPolygon, getRotationAngleAndAxis, rotateAroundAxis
 from solid.operations import getShellMeshFromSurfacesVertexs
 from surfaces.iSurface import ISurface
 
@@ -18,6 +18,8 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
     TOP_DIRECTION, RIGHT_DIRECTION = 1, 1
     BOTTOM_DIRECTION, LEFT_DIRECTION = -1, -1
 
+    HEAD_NUT_DRILL_DEPTH_PERCENTAGE = 0.2
+
     surfDims = configuration.surface.dimensions
     moldConfig = configuration.manufacture.mold
     puzzleConfig = moldConfig.puzzle
@@ -26,11 +28,15 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
 
     wallHeight = moldConfig.panels.walls.height
     wallThickness = moldConfig.panels.walls.thickness
-    flangeSize = moldConfig.panels.walls.flangeSize
     wallScrews = moldConfig.panels.walls.screws
     wallScrewsDiameter = moldConfig.panels.walls.screwsDiameter
+    wallScrewsHeadDiameter = moldConfig.panels.walls.screwsHeadDiameter
     pieceInsertNutDiameter = moldConfig.panels.walls.insertNutDiameter
     pieceInsertNutDepth = moldConfig.panels.walls.insertNutDepth
+    flangeSize = moldConfig.panels.walls.flangeSize
+    flangeScrewDiameter = moldConfig.panels.walls.flangeScrewsDiameter
+    flangeScrewsHeadDiameter = moldConfig.panels.walls.flangeScrewsHeadDiameter
+    flangeNutSDimension = moldConfig.panels.walls.flangeNutSDimension
 
     grid = configuration.manufacture.grid
 
@@ -180,22 +186,32 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
             pos = [ma_pos, sa_pos] if mainAxis == "x" else [sa_pos, ma_pos]
 
             drillDirection = getExtensionVector(wallSide, pos)
-            drillCenter = getOffsetPoints([pos], moldThickness - (wallHeight/2))[0]
+            drillCenter = getOffsetPoints([pos], moldThickness/2)[0]
 
             if isPiece:
                 drillCenter = drillCenter - drillDirection * pieceInsertNutDepth
                 drillDepth = 2 * pieceInsertNutDepth
                 drillRadius = pieceInsertNutDiameter/2
+
+                yield FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
             else:
-                drillCenter = drillCenter - drillDirection * wallThickness
+                drillCenter -= drillDirection * wallThickness
                 drillDepth = 3 * wallThickness
                 drillRadius = wallScrewsDiameter/2
 
-            yield FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
+                screwDrill = FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
+
+                drillCenter += drillDirection * ((2-HEAD_NUT_DRILL_DEPTH_PERCENTAGE)*wallThickness)
+                drillDepth = 3 * wallThickness
+                drillRadius = wallScrewsHeadDiameter/2
+                
+                headScreawDrill = FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
+
+                yield screwDrill.fuse(headScreawDrill)
 
     def getFlangeScrewDirll(wallSide, flangePosition, flangeType, lx, ly):
         drillDepth = 3*wallThickness
-        drillRadius = wallScrewsDiameter/2
+        drillRadius = flangeScrewDiameter/2
 
         p0 = sfcUtils.arcLenght2Coordinates(referenceSurface, [lx, ly], [xstart, ystart])
 
@@ -203,10 +219,31 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
 
         d1, d2 = getFlangeDirections(wallSide, flangePosition, flangeType, p0)
 
-        drillCenter = v0 + (d1 * flangeSize/2) - (d2 * wallThickness)
-        drillDirection = d2 
+        drillCenter = v0 + (d1 * (wallThickness + (flangeSize-wallThickness)/2))
+        drillCenter -= d2 * 2*wallThickness
 
-        return FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
+        drillDirection = d2 
+        
+        screwDrill = FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
+
+        drillCenter = v0 + (d1 * (wallThickness + (flangeSize-wallThickness)/2))
+        drillCenter += d2 * (1-HEAD_NUT_DRILL_DEPTH_PERCENTAGE)*wallThickness
+        
+        if flangePosition==TOP_FLANGE or flangePosition==LEFT_FLANGE:
+            nutPolygon = generateNutPolygon(flangeNutSDimension)
+            
+            axis, angle = getRotationAngleAndAxis(Z_VERSOR, drillDirection)
+            nutPolygon = [(rotateAroundAxis(v, axis, angle) + drillCenter)  for v in nutPolygon]
+            nutFace = FreeCADUtils.convertToFace(FreeCADUtils.convertToPolygon(nutPolygon))
+            
+            nutDrill = FreeCADUtils.extrudePolygon(nutFace, drillDirection *  drillDepth)
+
+            return screwDrill.fuse(nutDrill)
+        else:
+            drillRadius = flangeScrewsHeadDiameter/2
+            screwHeadDrill = FreeCADUtils.createCylinder(drillRadius, drillDepth, drillCenter, drillDirection)
+        
+            return screwDrill.fuse(screwHeadDrill)
 
     def getCoreWallMeshAndDrills(wallSide, lx, ly):
         def extendVertices(samplingPoint, vertices):
@@ -289,12 +326,15 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
     pnHeight = moldConfig.panels.dimensions.height
 
     piecesDrills = []
-    leadsAndDrills = []
+    wallsFlangesAndDrills = []
 
     for ix in range(piecesX):        
         for iy in range(piecesY):
-            rightLeadAndDrills, leftLeadAndDrills = [], []
-            topLeadAndDrills, bottomLeadAndDrills = [], []
+            rightWallAndDrills, leftWallAndDrills = None, None
+            topWallAndDrills, bottomWallAndDrills = None, None
+
+            rightFlangesAndDrills, leftFlangesAndDrills = [], []
+            topFlangesAndDrills, bottomFlangesAndDrills = [], []
 
             leftSide = (ix % pnWidth) == 0
             rightSide = ((ix+1) % pnWidth) == 0
@@ -306,122 +346,138 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
             lxstart = ix*pieceWidthLenght
 
             if leftSide:               
-                leftLeadAndDrills.append(
-                    getCoreWallMeshAndDrills(LEFT_WALL, lxstart, lystart))  
+                leftWallAndDrills=\
+                    getCoreWallMeshAndDrills(LEFT_WALL, lxstart, lystart)
 
                 piecesDrills.extend(
                     getPieceWallScrewsDrills(LEFT_WALL, lxstart, lystart))     
             else:
                 if topSide:
                     #agregar oreja a 90° arriba a la izquierda sólo a top 
-                    topLeadAndDrills.append(
+                    topFlangesAndDrills.append(
                         getFlangeMeshAndDrill(TOP_WALL, LEFT_FLANGE, MIDDLE_FLANGE, lxstart, lystart))
                 
                 if bottomSide:
                     #agregar oreja a 90° abajo a la izquierda sólo a bottom 
-                    bottomLeadAndDrills.append(
+                    bottomFlangesAndDrills.append(
                         getFlangeMeshAndDrill(BOTTOM_WALL, LEFT_FLANGE, MIDDLE_FLANGE, lxstart, lystart))
             
             if rightSide:
-                rightLeadAndDrills.append(
-                    getCoreWallMeshAndDrills(RIGHT_WALL, lxstart, lystart))
+                rightWallAndDrills=\
+                    getCoreWallMeshAndDrills(RIGHT_WALL, lxstart, lystart)
                 
                 piecesDrills.extend(
                     getPieceWallScrewsDrills(RIGHT_WALL, lxstart, lystart))     
             else:
                 if topSide:
                     #agregar oreja a 90° arriba a la derecha sólo a top 
-                    topLeadAndDrills.append(
+                    topFlangesAndDrills.append(
                         getFlangeMeshAndDrill(TOP_WALL, RIGHT_FLANGE, MIDDLE_FLANGE, lxstart, lystart))
                 
                 if bottomSide:
                     #agregar oreja a 90° abajo a la derecha sólo a bottom 
-                    bottomLeadAndDrills.append(
+                    bottomFlangesAndDrills.append(
                         getFlangeMeshAndDrill(BOTTOM_WALL, RIGHT_FLANGE, MIDDLE_FLANGE, lxstart, lystart))
 
             if topSide:
-                topLeadAndDrills.append(
-                    getCoreWallMeshAndDrills(TOP_WALL, lxstart, lystart))
+                topWallAndDrills=\
+                    getCoreWallMeshAndDrills(TOP_WALL, lxstart, lystart)
                 
                 piecesDrills.extend(
                     getPieceWallScrewsDrills(TOP_WALL, lxstart, lystart))     
             else:
                 if leftSide:
                     #agregar oreja a 90° arriba a la izquierda sólo a left
-                    leftLeadAndDrills.append(
+                    leftFlangesAndDrills.append(
                         getFlangeMeshAndDrill(LEFT_WALL, TOP_FLANGE, MIDDLE_FLANGE, lxstart, lystart)) 
                 
                 if rightSide:
                     #agregar oreja a 90° abajo a la derecha sólo a right 
-                    rightLeadAndDrills.append(
+                    rightFlangesAndDrills.append(
                         getFlangeMeshAndDrill(RIGHT_WALL, TOP_FLANGE, MIDDLE_FLANGE, lxstart, lystart)) 
 
             if bottomSide:
-                bottomLeadAndDrills.append(
-                    getCoreWallMeshAndDrills(BOTTOM_WALL, lxstart, lystart))
+                bottomWallAndDrills=\
+                    getCoreWallMeshAndDrills(BOTTOM_WALL, lxstart, lystart)
 
                 piecesDrills.extend(
                     getPieceWallScrewsDrills(BOTTOM_WALL, lxstart, lystart))
             else:
                 if leftSide:
                     #agregar oreja a 90° abajo a la izquierda sólo a left 
-                    leftLeadAndDrills.append(
+                    leftFlangesAndDrills.append(
                         getFlangeMeshAndDrill(LEFT_WALL, BOTTOM_FLANGE, MIDDLE_FLANGE, lxstart, lystart)) 
                 
                 if rightSide:
                     #agregar oreja a 90° arriba a la derecha sólo a right 
-                    rightLeadAndDrills.append(
+                    rightFlangesAndDrills.append(
                         getFlangeMeshAndDrill(RIGHT_WALL, BOTTOM_FLANGE, MIDDLE_FLANGE, lxstart, lystart)) 
 
             if leftSide and topSide:
                 #agregar oreja a 45° arriba a la izquierda a left y a top
-                leftLeadAndDrills.append(
+                leftFlangesAndDrills.append(
                         getFlangeMeshAndDrill(LEFT_WALL, TOP_FLANGE, CORNER_FLANGE, lxstart, lystart))
-                topLeadAndDrills.append(
+                topFlangesAndDrills.append(
                         getFlangeMeshAndDrill(TOP_WALL, LEFT_FLANGE, CORNER_FLANGE, lxstart, lystart)) 
             
             if leftSide and bottomSide:
                 #agregar oreja a 45° abajo a la izquierda a left y a bottom
-                leftLeadAndDrills.append(
+                leftFlangesAndDrills.append(
                         getFlangeMeshAndDrill(LEFT_WALL, BOTTOM_FLANGE, CORNER_FLANGE, lxstart, lystart))
-                bottomLeadAndDrills.append(
+                bottomFlangesAndDrills.append(
                         getFlangeMeshAndDrill(BOTTOM_WALL, LEFT_FLANGE, CORNER_FLANGE, lxstart, lystart)) 
 
             if rightSide and topSide:
                 #agregar oreja a 45° arriba a la derecha a right y a top
-                rightLeadAndDrills.append(
+                rightFlangesAndDrills.append(
                         getFlangeMeshAndDrill(RIGHT_WALL, TOP_FLANGE, CORNER_FLANGE, lxstart, lystart))
-                topLeadAndDrills.append(
+                topFlangesAndDrills.append(
                         getFlangeMeshAndDrill(TOP_WALL, RIGHT_FLANGE, CORNER_FLANGE, lxstart, lystart)) 
 
             if rightSide and bottomSide:
                 #agregar oreja a 45° abajo a la derecha a right y a bottom
-                rightLeadAndDrills.append(
+                rightFlangesAndDrills.append(
                         getFlangeMeshAndDrill(RIGHT_WALL, BOTTOM_FLANGE, CORNER_FLANGE, lxstart, lystart))
-                bottomLeadAndDrills.append(
+                bottomFlangesAndDrills.append(
                         getFlangeMeshAndDrill(BOTTOM_WALL, RIGHT_FLANGE, CORNER_FLANGE, lxstart, lystart)) 
 
-            def checkAndAppend(data):
-                if len(data) > 0: leadsAndDrills.append(data)    
+            if leftWallAndDrills != None:
+                wallsFlangesAndDrills.append([leftWallAndDrills, leftFlangesAndDrills])
             
-            checkAndAppend(rightLeadAndDrills)
-            checkAndAppend(leftLeadAndDrills)
-            checkAndAppend(topLeadAndDrills)
-            checkAndAppend(bottomLeadAndDrills)
+            if rightWallAndDrills != None:
+                wallsFlangesAndDrills.append([rightWallAndDrills, rightFlangesAndDrills])
+            
+            if topWallAndDrills != None:
+                wallsFlangesAndDrills.append([topWallAndDrills, topFlangesAndDrills])
+            
+            if bottomWallAndDrills != None:
+                wallsFlangesAndDrills.append([bottomWallAndDrills, bottomFlangesAndDrills])
 
-    return leadsAndDrills, piecesDrills
+    return wallsFlangesAndDrills, piecesDrills
 
 def generatePanelsParts(configuration: Configuration, referenceSurface: ISurface):
-    wallsAndDrills, piecesDrills = generatePanelsWalls(configuration, referenceSurface)
-    
-    for wallAndDrills in wallsAndDrills:
-        wallSolids = []
-        for wallElements in wallAndDrills:
-            wallElement, wallDrills = wallElements
-            wallSolid = FreeCADUtils.convertMeshToSolid(wallElement)
+    wallsFlangesAndDrills, piecesDrills = generatePanelsWalls(configuration, referenceSurface)
 
-            for wallDrill in wallDrills:
-                wallSolid = wallSolid.cut(wallDrill)
-
-            wallSolids.append(wallSolid)
+    walls = []
+    for wallFlangesAndDrills in wallsFlangesAndDrills:
+        wallAndDrills, flangesAndDrills = wallFlangesAndDrills
+        wall, wallDrills = wallAndDrills
         
+        wallSolid = FreeCADUtils.convertMeshToSolid(wall)
+        
+        for wallDrill in wallDrills:
+            wallSolid = wallSolid.cut(wallDrill)
+
+        wallParts = [wallSolid]
+        for flangeAndDrills in flangesAndDrills:
+            flange, flangeDrills = flangeAndDrills
+            flangeSolid = FreeCADUtils.convertMeshToSolid(flange)
+        
+            for flangeDrill in flangeDrills:
+                flangeSolid = flangeSolid.cut(flangeDrill)
+                
+            wallParts.append(flangeSolid)
+        
+        walls.append(FreeCADUtils.makeCompound(wallParts))
+    
+    return walls, piecesDrills       

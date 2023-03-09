@@ -7,8 +7,11 @@ import svg.utils as svgUtils
 
 from solid.operations import getLeadMesh
 from surfaces.iSurface import ISurface
-from generator.utils import ORIGIN, Y_VERSOR, Z_VERSOR, ZERO_VECTOR, calculatePiecesData, getShiftedClearPoygon
+from generator.utils import ORIGIN, X_VERSOR, Y_VERSOR, Z_VERSOR, ZERO_VECTOR, calculatePiecesData, getShiftedClearPoygon
 from utils.utils import Configuration
+
+X_DIRECTION = 0
+Y_DIRECTION = 1
 
 def generateTabsShells(configuration: Configuration,
     referenceSurface : ISurface,  topOffsetSurface : ISurface, 
@@ -16,10 +19,10 @@ def generateTabsShells(configuration: Configuration,
     
     def getExtrudedPolygon(tabPolygon, bottomSurface, topSurface, thickness, n_u, clearence):
         bTabPolygon = getShiftedClearPoygon(bottomSurface, n_u, 
-                thickness, tabPolygon, "down", clearence)
+                2*thickness, tabPolygon, "down", clearence)
         
         tTabPolygon = getShiftedClearPoygon(topSurface, n_u, 
-                thickness, tabPolygon, "up", clearence)
+                2*thickness, tabPolygon, "up", clearence)
         
         return getLeadMesh(bTabPolygon, tTabPolygon, True) 
 
@@ -34,21 +37,23 @@ def generateTabsShells(configuration: Configuration,
         
         return np.array(pco.Execute(flangeSize)[0]) / FLOAT_INT_CONVERSION_FACTOR
         
-    def locateTabPolygon(tabPolygon, lx, ly, xstart, ystart):
-        referenceDirection = Y_VERSOR
+    def locateTabPolygon(tabPolygon, lx, ly, xstart, ystart, direction):
+        tabPolygon = [np.append(v, [0]) for v in tabPolygon]
 
-        tabCenterPosition = np.array(
-            [sfcUtils.arcLenght2Coordinate(referenceSurface, lx, "x", xstart),
-             sfcUtils.arcLenght2Coordinate(referenceSurface, ly, "y", ystart)])
+        tabCenterPosition = \
+            sfcUtils.arcLenght2Coordinates(referenceSurface, [lx, ly], [xstart, ystart])
 
         n_u = sfcUtils.getUnitNormalVector(referenceSurface, tabCenterPosition)
-        axis, angle = utlUtils.getRotationAngleAndAxis(np.array(Z_VERSOR), n_u)
+        axis, angle = utlUtils.getRotationAngleAndAxis(Z_VERSOR, n_u)
         
-        if not np.array_equal(axis, ZERO_VECTOR):
-            tabPolygon = [utlUtils.rotateAroundAxis(np.append(v, [0]), axis, angle) for v in tabPolygon]
-            referenceDirection = utlUtils.rotateAroundAxis(Y_VERSOR, axis, angle)
+        calibrationAxis = X_VERSOR if direction==X_DIRECTION else Y_VERSOR
+        referenceDirection = calibrationAxis
 
-        direction = utlUtils.planeLineIntersection(ORIGIN, n_u, Y_VERSOR, Z_VERSOR)
+        if not np.array_equal(axis, ZERO_VECTOR):
+            tabPolygon = [utlUtils.rotateAroundAxis(v, axis, angle) for v in tabPolygon]
+            referenceDirection = utlUtils.rotateAroundAxis(calibrationAxis, axis, angle)
+
+        direction = utlUtils.planeLineIntersection(ORIGIN, n_u, calibrationAxis, Z_VERSOR)
         axis, angle = utlUtils.getRotationAngleAndAxis(referenceDirection, direction)
 
         if not np.array_equal(axis, ZERO_VECTOR):
@@ -87,10 +92,10 @@ def generateTabsShells(configuration: Configuration,
             lx = (ix+1/2)*pieceWidthLenght
             ly = (iy+1)*pieceDepthLenght
 
-            tabPolygon, n_u = locateTabPolygon(puzzleTabPolygon, lx, ly, xstart, ystart)
+            tabPolygon, n_u = locateTabPolygon(puzzleTabPolygon, lx, ly, xstart, ystart, Y_DIRECTION)
             tabShell = getExtrudedPolygon(tabPolygon, referenceSurface, topOffsetSurface, thickness, n_u, thickness)
 
-            tabPolygon, n_u = locateTabPolygon(puzzleTabBasePolygon, lx, ly, xstart, ystart)
+            tabPolygon, n_u = locateTabPolygon(puzzleTabBasePolygon, lx, ly, xstart, ystart, Y_DIRECTION)
             tabBaseShell = getExtrudedPolygon(tabPolygon, topOffsetSurface, baseOffsetSurface, thickness, n_u, thickness)
 
             yield tabShell, tabBaseShell
@@ -110,10 +115,10 @@ def generateTabsShells(configuration: Configuration,
             ly = (iy+1/2)*pieceDepthLenght
             lx = (ix+1)*pieceWidthLenght
 
-            tabPolygon, n_u = locateTabPolygon(puzzleTabPolygon, lx, ly, xstart, ystart)
+            tabPolygon, n_u = locateTabPolygon(puzzleTabPolygon, lx, ly, xstart, ystart, X_DIRECTION)
             tabShell = getExtrudedPolygon(tabPolygon, referenceSurface, topOffsetSurface, thickness, n_u, thickness)
 
-            tabPolygon, n_u = locateTabPolygon(puzzleTabBasePolygon, lx, ly, xstart, ystart)
+            tabPolygon, n_u = locateTabPolygon(puzzleTabBasePolygon, lx, ly, xstart, ystart, X_DIRECTION)
             tabBaseShell = getExtrudedPolygon(tabPolygon, topOffsetSurface, baseOffsetSurface, thickness, n_u, thickness)
 
             yield tabShell, tabBaseShell
