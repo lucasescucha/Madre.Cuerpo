@@ -16,43 +16,46 @@ configurationData = dict(
     manufacture=dict(
         grid=dict(
             # X axis in arc lenght units (max value)
-            width=10,
+            width=5,
             # Y axis in arc lenght units (max value)
-            height=10,
+            height=5,
         ),
         mold=dict(
             puzzle=dict(
-                thickness=9,
+                thickness=10,
                 pieces=dict(
                     # X axis in arc lenght units (max value)
-                    width=50,
+                    width=150,
                     # Y axis in arc lenght units (max value)
-                    height=80,
+                    height=150,
                 ),
                 tabs=dict(
                     # By default tab is y-axis oriented
                     file="svg/union.svg",
-                    width=10,
+                    width=25,
                     baseThickness=2,
-                    flangeSize=3
+                    flangeSize=1
                 ),
             ),
             panels=dict(
                 dimensions=dict(
                     # unit: pieces
-                    width=5,   
+                    width=2,   
                     # unit: pieces
-                    height=7,
+                    height=2,
                 ),
                 walls=dict(
                     height=30,
-                    thickness=4,
-                    screws=2,
-                    screwsDiameter=1,
+                    thickness=5,
+                    screws=3,
+                    screwsDiameter=3.1,
+                    screwsHeadDiameter=5.7,
                     insertNutDiameter=4,
-                    insertNutDepth=3,
-                    flangeSize=20,
-                    flangeScrewsDiameter=3                    
+                    insertNutDepth=4.5,
+                    flangeSize=15,
+                    flangeScrewsDiameter=3.1,
+                    flangeScrewsHeadDiameter=5.7,
+                    flangeNutSDimension=5.5
                 ),
             ),
         ),
