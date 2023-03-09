@@ -30,34 +30,34 @@ def generateElements(configuration: Configuration):
     body = FreeCADUtils.convertMeshToSolid(surfaceMesh)
     base = FreeCADUtils.convertMeshToSolid(baseMesh)
 
-    # print("Creando tabs")
-    # tabsShells = list(generateTabsShells(configuration, 
-    #     referenceSurface, topOffsetSurface, baseOffsetSurface))
+    print("Creando tabs")
+    tabsShells = list(generateTabsShells(configuration, 
+        referenceSurface, topOffsetSurface, baseOffsetSurface))
 
-    # for tabShell, tabBaseShell in tabsShells:
-    #     tabShellMesh = FreeCADUtils.convertMeshToSolid(tabShell)
-    #     body, tab = sliceAndGetSorteredResult(body, tabShellMesh)
+    for tabShell, tabBaseShell in tabsShells:
+        tabShellMesh = FreeCADUtils.convertMeshToSolid(tabShell)
+        body, tab = sliceAndGetSorteredResult(body, tabShellMesh)
 
-    #     tabShellMesh = FreeCADUtils.convertMeshToSolid(tabBaseShell)
-    #     _, tabBase = sliceAndGetSorteredResult(base, tabShellMesh)
+        tabShellMesh = FreeCADUtils.convertMeshToSolid(tabBaseShell)
+        _, tabBase = sliceAndGetSorteredResult(base, tabShellMesh)
         
-    #     tab = tab.fuse(tabBase)
+        tab = tab.fuse(tabBase)
 
-    #     print("Tab creado")
-    #     FreeCADUtils.addPartToDocument(tab)
+        print("Tab creado")
+        FreeCADUtils.addPartToDocument(tab)
 
-    # print("Creando paredes y perforaciones")
-    # walls, drills = generatePanelsParts(configuration, referenceSurface)
-    # FreeCADUtils.addPartsToDocument(walls)
+    print("Creando paredes y perforaciones")
+    walls, drills = generatePanelsParts(configuration, referenceSurface)
+    FreeCADUtils.addPartsToDocument(walls)
 
-    # print("Perforando superficie")
-    #for drill in drills:
-    #    body = body.cut(drill)
+    print("Perforando superficie")
+    for drill in drills:
+        body = body.cut(drill)
     
     print("Creando planos y cortando superficie")
     cutSurfaces = list(generatePiecesCutSurfaces(configuration, referenceSurface))
     FreeCADUtils.addPartsToDocument(cutSurfaces)
     FreeCADUtils.addPartToDocument(body)
-    #FreeCADUtils.addPartsToDocument(FreeCADUtils.slicePart(body, cutSurfaces))
+    FreeCADUtils.addPartsToDocument(FreeCADUtils.slicePart(body, cutSurfaces))
 
     return document
