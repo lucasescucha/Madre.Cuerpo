@@ -1,6 +1,7 @@
 # Modificar el archivo freecad.pth a env/site-packages para que funcione la importación de FreeCAD
 # pyright: reportMissingImports=false
 
+import math
 import FreeCAD
 
 import Mesh
@@ -8,6 +9,7 @@ import Part
 import Draft
 
 import BOPTools.SplitAPI as SplitAPI
+from utils.utils import getRotationAngleAndAxis
 
 TOLERANCE = 0.1
 
@@ -16,8 +18,14 @@ def convertToPolygon(polygon):
     wire = Part.makePolygon(vertices)
     return wire
 
+def convertToFace(polygon):
+    return Part.Face(polygon)
+
 def toFreeCADVector(vector):
     return FreeCAD.Vector(vector[0], vector[1], vector[2])
+
+def makeCompound(parts):
+    return Part.makeCompound(parts)
 
 def extrudePolygon(polygon, displacement):
     return polygon.extrude(toFreeCADVector(displacement))
@@ -36,7 +44,8 @@ def slicePart(part, tools):
     return result.Solids
 
 def createCylinder(radius, lenght, center, direction):
-    return Part.makeCylinder(radius, lenght, toFreeCADVector(center), toFreeCADVector(direction), 360)
+    return Part.makeCylinder(radius, lenght, toFreeCADVector(center), 
+            toFreeCADVector(direction), 360)
 
 def convertMeshToSolid(trianglesMesh):
     mesh = Mesh.Mesh(trianglesMesh)
@@ -44,9 +53,6 @@ def convertMeshToSolid(trianglesMesh):
     part.makeShapeFromMesh(mesh.Topology, TOLERANCE)
 
     return Part.Solid(part)
-
-def createMesh(trianglesMesh):
-    return Mesh.Mesh(trianglesMesh)
 
 def addPartsToDocument(parts):
     for part in parts:
@@ -56,6 +62,8 @@ def addMeshesToDocument(meshes):
     for mesh in meshes:
         Mesh.show(mesh)
 
+def addMeshToDocument(mesh):
+    Mesh.show(mesh)
 
 def addPartToDocument(part):
     Part.show(part)

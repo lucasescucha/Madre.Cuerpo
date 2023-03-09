@@ -55,16 +55,21 @@ def getXYFromPoints(points):
 
     return x, y
 
-def createNutHousingPolygon(margin, s):
-    # e/2 * cos(30°) = s/2 => e = s / cos(30°)
-    # https://www.fastenerdata.co.uk/media/wysiwyg/technical/FULLNUT.jpg
+def generateNutPolygon(s):
+    COS_30 = math.sqrt(3)/2
     e = s/COS_30
-    e_2 = e/2
-    return [[0, s/2],
-            [margin+e_2*(1 + SIN_30), s/2],
-            [e+margin, 0],
-            [margin+e_2*(1 + SIN_30), -s/2],
-            [0, -s/2]]
+    radius = e/2 
+
+    return generateRegularPolygon(6, radius)
+
+def generateRegularPolygon(sides, radius, rotation=0, z=0):
+    one_segment = math.pi * 2 / sides
+
+    return [
+        [math.sin(one_segment * i + rotation) * radius,
+         math.cos(one_segment * i + rotation) * radius,
+         z] for i in range(sides + 1)]
+
 class Configuration(dict):
     def __init__(self, dictionary: dict) -> None:
         for k in dictionary:
