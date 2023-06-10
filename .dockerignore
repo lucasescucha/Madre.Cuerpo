@@ -24,5 +24,6 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 **/*.FCStd
+**/*.stl
 **/output/*.*
 README.md
