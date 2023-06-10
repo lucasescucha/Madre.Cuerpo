@@ -52,12 +52,11 @@ def generateElements(configuration: Configuration):
 
     print("Perforando superficie")
     for drill in drills:
+        print("Perforación realizada")
         body = body.cut(drill)
     
     print("Creando planos y cortando superficie")
     cutSurfaces = list(generatePiecesCutSurfaces(configuration, referenceSurface))
-    FreeCADUtils.addPartsToDocument(cutSurfaces)
-    FreeCADUtils.addPartToDocument(body)
     FreeCADUtils.addPartsToDocument(FreeCADUtils.slicePart(body, cutSurfaces))
 
     return document
