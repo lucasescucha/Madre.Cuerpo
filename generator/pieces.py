@@ -3,7 +3,7 @@ import numpy as np
 import surfaces.utils as sfcUtils
 import FreeCADTools.utils as FreeCADUtils
 
-from generator.utils import calculatePiecesData, getShiftedClearPoygon
+from generator.utils import calculatePiecesData
 from solid.operations import getLeadMesh
 from surfaces.iSurface import ISurface
 from surfaces.utils import calculateSamplingPoints
@@ -11,6 +11,7 @@ from utils.utils import Configuration
 
 SAMPLING_POINTS_EXTRA_STEPS = 4
 GRID_SIZE_FACTOR = 0.6
+CUT_SURFACE_EXTRA_LENGHT = 0.05
 
 def generatePiecesCutSurfaces(configuration: Configuration, 
     referenceSurface : ISurface):
@@ -20,14 +21,9 @@ def generatePiecesCutSurfaces(configuration: Configuration,
         position3d = np.append(position2d, [referenceSurface.F(position2d)]) 
         
         n_u = sfcUtils.getUnitNormalVector(referenceSurface, position2d)
-        
-        bottomOffset = getShiftedClearPoygon(referenceSurface, n_u, 3*thickness, 
-                [position3d], "down", thickness)
 
-        topOffset = getShiftedClearPoygon(referenceSurface, n_u, 3*thickness, 
-                [position3d], "up", thickness)
-            
-        return [bottomOffset[0], topOffset[0]] 
+        return [position3d - (n_u*thickness*CUT_SURFACE_EXTRA_LENGHT), 
+                position3d + (n_u*thickness*(1 + CUT_SURFACE_EXTRA_LENGHT))]
 
     surfDims = configuration.surface.dimensions
     puzzleConfig = configuration.manufacture.mold.puzzle
