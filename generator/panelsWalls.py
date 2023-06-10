@@ -19,6 +19,7 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
     BOTTOM_DIRECTION, LEFT_DIRECTION = -1, -1
 
     HEAD_NUT_DRILL_DEPTH_PERCENTAGE = 0.2
+    UNION_MARKS_MIN_DIAMETER = 2
 
     surfDims = configuration.surface.dimensions
     moldConfig = configuration.manufacture.mold
@@ -29,6 +30,8 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
     wallHeight = moldConfig.panels.walls.height
     wallThickness = moldConfig.panels.walls.thickness
     wallScrews = moldConfig.panels.walls.screws
+    wallUnionMarks = moldConfig.panels.walls.unionMarks
+    wallUnionMarksDiameter = moldConfig.panels.walls.unionMarksDiameter
     wallScrewsDiameter = moldConfig.panels.walls.screwsDiameter
     wallScrewsHeadDiameter = moldConfig.panels.walls.screwsHeadDiameter
     pieceInsertNutDiameter = moldConfig.panels.walls.insertNutDiameter
@@ -162,6 +165,41 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         
         return mainAxis, secondaryAxis, malStart, malEnd, salStart
 
+    def getWallUnionMarksDrills(wallSide, lx, ly):
+
+        mainAxis, secondaryAxis, malStart, malEnd, salStart = \
+            getAxisParameters(wallSide, lx, ly)
+
+        secondaryAxis = "y" if mainAxis == "x" else "x"
+
+        pa_start = xstart if mainAxis == "x" else ystart
+        sa_start = xstart if secondaryAxis == "x" else ystart
+
+        sa_pos = sfcUtils.arcLenght2Coordinate(
+                referenceSurface, salStart, secondaryAxis, sa_start)
+
+        lmarks = (malEnd-malStart)/(wallUnionMarks+1)
+ 
+        for i in range(wallUnionMarks):
+            lmark = malStart + (i+1)*lmarks 
+            
+            ma_pos = sfcUtils.arcLenght2Coordinate(
+                referenceSurface, lmark, mainAxis, pa_start)
+
+            pos = [ma_pos, sa_pos] if mainAxis == "x" else [sa_pos, ma_pos]
+
+            drillDirection = getExtensionVector(wallSide, pos)
+            drillCenter = getOffsetPoints([pos], -(wallHeight - moldThickness)/2)[0]           
+                        
+            drillCenter += drillDirection * (wallThickness/2)
+            drillDepth = 2 * wallThickness
+
+            radius1 = UNION_MARKS_MIN_DIAMETER/2
+            d1 = (radius1/(wallUnionMarksDiameter/2-radius1)) * wallThickness/2
+            radius2 = ((d1 + drillDepth)/(wallThickness/2)) * (wallUnionMarksDiameter/2-radius1)
+
+            yield FreeCADUtils.createCone(radius1, radius2, drillDepth, drillCenter, -drillDirection)
+
     def getPieceWallScrewsDrills(wallSide, lx, ly, isPiece = True):
 
         mainAxis, secondaryAxis, malStart, malEnd, salStart = \
@@ -189,7 +227,7 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
             drillCenter = getOffsetPoints([pos], moldThickness/2)[0]
 
             if isPiece:
-                drillCenter = drillCenter - drillDirection * pieceInsertNutDepth
+                drillCenter -= drillDirection * pieceInsertNutDepth
                 drillDepth = 2 * pieceInsertNutDepth
                 drillRadius = pieceInsertNutDiameter/2
 
@@ -287,7 +325,8 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
 
         leadBFace = [eTopVertices, eBottomVertices]
 
-        drills = getPieceWallScrewsDrills(wallSide, lx, ly, isPiece=False)
+        drills = list(getPieceWallScrewsDrills(wallSide, lx, ly, isPiece=False))
+        drills.extend(getWallUnionMarksDrills(wallSide, lx, ly,))
 
         return [getShellMeshFromSurfacesVertexs(leadAFace, leadBFace), drills]
 

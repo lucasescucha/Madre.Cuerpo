@@ -47,6 +47,10 @@ def createCylinder(radius, lenght, center, direction):
     return Part.makeCylinder(radius, lenght, toFreeCADVector(center), 
             toFreeCADVector(direction), 360)
 
+def createCone(radius1, radius2, lenght, center, direction):
+    return Part.makeCone(radius1, radius2, lenght, toFreeCADVector(center), 
+            toFreeCADVector(direction), 360)
+
 def convertMeshToSolid(trianglesMesh):
     mesh = Mesh.Mesh(trianglesMesh)
     part = Part.Shape()
