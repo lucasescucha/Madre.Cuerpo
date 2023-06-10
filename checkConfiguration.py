@@ -20,7 +20,7 @@ def checkConfiguration():
     _, _, yPieces,_ = calculatePiecesData(referenceSurface, 
         surfDims, puzzleConfig.pieces, "y")
 
-    print("Piezas en x", xPieces, "Piezas en y", yPieces)
+    print("Piezas en x:", xPieces, "/Piezas en y:", yPieces)
 
     pnWidth = moldConfig.panels.dimensions.width
     pnHeight = moldConfig.panels.dimensions.height
