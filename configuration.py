@@ -3,14 +3,14 @@ configurationData = dict(
     surface=dict(
         dimensions=dict(
             # X axis
-            width=333,
+            width=500,
             # Y axis
-            depth=333,
+            depth=400,
             # Z axis
-            height=333,
+            height=400,
         ),
         shape=dict(
-            zeroHeight=166.5,
+            zeroHeight=200,
         )
     ),
     manufacture=dict(
@@ -40,7 +40,7 @@ configurationData = dict(
             panels=dict(
                 dimensions=dict(
                     # unit: pieces
-                    width=2,   
+                    width=3,   
                     # unit: pieces
                     height=2,
                 ),

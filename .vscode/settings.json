@@ -13,5 +13,6 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/.venv/Lib/site-packages"
     ],
-    "svg.preview.background": "transparent"
+    "svg.preview.background": "transparent",
+    "cSpell.enabled": false
 }
