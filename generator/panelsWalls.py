@@ -178,10 +178,10 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         sa_pos = sfcUtils.arcLenght2Coordinate(
                 referenceSurface, salStart, secondaryAxis, sa_start)
 
-        lmarks = (malEnd-malStart)/(wallUnionMarks+1)
+        lmarks = (malEnd-malStart)/wallUnionMarks
  
         for i in range(wallUnionMarks):
-            lmark = malStart + (i+1)*lmarks 
+            lmark = malStart + (1/2+i)*lmarks
             
             ma_pos = sfcUtils.arcLenght2Coordinate(
                 referenceSurface, lmark, mainAxis, pa_start)
@@ -213,10 +213,10 @@ def generatePanelsWalls(configuration: Configuration, referenceSurface: ISurface
         sa_pos = sfcUtils.arcLenght2Coordinate(
                 referenceSurface, salStart, secondaryAxis, sa_start)
 
-        ldrills = (malEnd-malStart)/(wallScrews+1)
+        ldrills = (malEnd-malStart)/wallScrews
  
         for i in range(wallScrews):
-            ldrill = malStart + (i+1)*ldrills 
+            ldrill = malStart + (1/2+i)*ldrills 
             
             ma_pos = sfcUtils.arcLenght2Coordinate(
                 referenceSurface, ldrill, mainAxis, pa_start)
