@@ -72,6 +72,8 @@ def addPartToDocument(part):
 def createNewDocument():
     return FreeCAD.newDocument()
 
-
 def saveDocument(document, path):
     document.saveAs(path)
+
+def openDocument(path):
+    return FreeCAD.open(path)
