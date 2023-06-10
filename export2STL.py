@@ -6,7 +6,7 @@ import FreeCADTools.utils as FreeCADUtils
 document = FreeCADUtils.openDocument("output/output.FCStd")
 
 if os.path.exists("output/stl"):
-    shutil.rmtree("output/stl", ignore_errors=True)
+    shutil.rmtree("output/stl")
 
 os.makedirs("output/stl")
 
