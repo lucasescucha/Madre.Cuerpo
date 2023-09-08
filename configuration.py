@@ -22,7 +22,7 @@ configurationData = dict(
         ),
         mold=dict(
             puzzle=dict(
-                thickness=10,
+                thickness=4,
                 pieces=dict(
                     # X axis in arc lenght units (max value)
                     width=150,
@@ -52,6 +52,7 @@ configurationData = dict(
                     screws=3,
                     screwsDiameter=3.1,
                     screwsHeadDiameter=5.7,
+                    insertNutMargin=3,
                     insertNutDiameter=4,
                     insertNutDepth=4.5,
                     flangeSize=15,

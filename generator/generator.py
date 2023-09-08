@@ -27,10 +27,10 @@ def generateElements(configuration: Configuration):
     print("Creando superficies")
     surfaceMesh, baseMesh = generateSurfacesMeshes(configuration, referenceSurface)
 
-    body = FreeCADUtils.convertMeshToSolid(surfaceMesh)
-    base = FreeCADUtils.convertMeshToSolid(baseMesh)
+    #body = FreeCADUtils.convertMeshToSolid(surfaceMesh)
+    #base = FreeCADUtils.convertMeshToSolid(baseMesh)
 
-    print("Creando tabs")
+    """ print("Creando tabs")
     tabsShells = list(generateTabsShells(configuration, 
         referenceSurface, topOffsetSurface, baseOffsetSurface))
 
@@ -45,18 +45,17 @@ def generateElements(configuration: Configuration):
 
         print("Tab creado")
         FreeCADUtils.addPartToDocument(tab)
-
+ """
     print("Creando paredes y perforaciones")
-    walls, drills = generatePanelsParts(configuration, referenceSurface)
+    walls, drills, _ = generatePanelsParts(configuration, referenceSurface)
     FreeCADUtils.addPartsToDocument(walls)
-
-    print("Perforando superficie")
-    for drill in drills:
+    
+    """ print("Perforando superficie")
         print("Perforación realizada")
         body = body.cut(drill)
     
     print("Creando planos y cortando superficie")
     cutSurfaces = list(generatePiecesCutSurfaces(configuration, referenceSurface))
-    FreeCADUtils.addPartsToDocument(FreeCADUtils.slicePart(body, cutSurfaces))
+    FreeCADUtils.addPartsToDocument(FreeCADUtils.slicePart(body, cutSurfaces)) """
 
     return document

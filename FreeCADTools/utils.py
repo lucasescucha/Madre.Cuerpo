@@ -1,7 +1,6 @@
 # Modificar el archivo freecad.pth a env/site-packages para que funcione la importación de FreeCAD
 # pyright: reportMissingImports=false
 
-import math
 import FreeCAD
 
 import Mesh
@@ -35,6 +34,11 @@ def createPlane(length, width, pnt, dir):
     fcDir = FreeCAD.Vector(dir[0], dir[1], dir[2])
     return Part.makePlane(length, width, fcPnt, fcDir)
 
+def create3dText(text, size, extrusion):
+    font = "/font/arial.ttf"
+    text = Draft.makeShapeString(text, font, size)
+    return extrudePolygon(text.Shape, extrusion)
+
 def createText(text, pnt):
     fcPnt = FreeCAD.Vector(pnt[0], pnt[1], pnt[2])
     return Draft.makeText(text, fcPnt)
@@ -50,6 +54,13 @@ def createCylinder(radius, lenght, center, direction):
 def createCone(radius1, radius2, lenght, center, direction):
     return Part.makeCone(radius1, radius2, lenght, toFreeCADVector(center), 
             toFreeCADVector(direction), 360)
+
+def createSphere(radius, center):
+    return Part.makeSphere(radius, toFreeCADVector(center))
+
+def createBox(length, width, height, point, direction):
+    return Part.makeBox(length,width,height, toFreeCADVector(point), 
+            toFreeCADVector(direction))
 
 def convertMeshToSolid(trianglesMesh):
     mesh = Mesh.Mesh(trianglesMesh)
